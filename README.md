@@ -1,6 +1,16 @@
-# SDLE_project
+# SDLE Second Assignment of group T03G07.
+
+Group members: 
+
+1. Pedro Borges (up202207552@up.pt)
+2. Lucas Faria (up202207540@up.pt)
+3. Alexandre Lopes (up202207015@.up.pt)
+
+
+## Introduction
 
 Local-first shopping list application designed for collaborative use. Users can create shopping lists, share them with others, add or modify products, and mark items as purchased or partially acquired by specifying the bought quantity. All data is stored locally to ensure offline availability and durability, with synchronization enabled for seamless multi-user collaboration.
+
 
 ## Architecture
 
@@ -37,3 +47,4 @@ The CRDT architecture may require further discussion and refinement. However, a 
 
 The CRDTS must be made by us. Some other framework may be needed in the future. 
     
+
