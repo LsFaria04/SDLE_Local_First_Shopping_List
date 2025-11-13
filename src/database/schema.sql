@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS product_update;
 
 CREATE TABLE list(
     id INT PRIMARY KEY,
+    name TEXT NOT NULL,
     globalId INT,
     soft_delete BOOLEAN NOT NULL DEFAULT 0
 );
