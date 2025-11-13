@@ -16,8 +16,8 @@ Local-first shopping list application designed for collaborative use. Users can 
 
 It has three main components:
  - **Client**: The client is the software running on the user's device. It captures user input and stores updates in a local SQLite database, which maintains the current CRDT states for each shopping list. This ensures offline availability and enables conflict-free synchronization with the cloud.
- - **Router/Load Balancer**: The load balancer acts as an intermediary between the client and the cloud infrastructure. When a client creates a new shopping list, the load balancer assigns it to a specific server node using a consistent hashing strategy (inspired by the DynamoDB model). This ensures an even distribution of lists across nodes while minimizing rebalancing when nodes are added or removed. Since each list is typically shared by a small group (2 to 6 users, such as a household), there's no need to replicate it across multiple nodes — a sharded approach is sufficient. For subsequent updates, a router component forwards requests directly to the node responsible for storing the list's data.
- - **Cloud Nodes**: Stores the CRDT states of shopping lists. The system follows an eventually consistent model, meaning the cloud node may not always be perfectly synchronized with the clients. This trade-off enables high performance and fault tolerance, while ensuring that all replicas eventually converge to the same state.
+ - **Router/Load Balancer**: The load balancer acts as an intermediary between the client and the cloud infrastructure. When a client creates a new shopping list, the load balancer assigns it to a specific server node using a consistent hashing strategy (inspired by the DynamoDB model). This ensures an even distribution of lists across nodes while minimizing rebalancing when nodes are added or removed. Each list is replicated across multiple nodes to ensure fault tolerance and high availability. For subsequent updates, a router component forwards requests to the replica nodes responsible for storing the list's data.
+ - **Cloud Nodes**: Stores replicated CRDT states of shopping lists. The system follows an eventually consistent model with replication, meaning the cloud nodes may not always be perfectly synchronized with the clients or each other. This trade-off enables high performance and fault tolerance, while ensuring that all replicas eventually converge to the same state.
 
 The CRDT architecture may require further discussion and refinement. However, a possible structure for the local database is outlined below:
   - **List**: 
@@ -42,7 +42,8 @@ The CRDT architecture may require further discussion and refinement. However, a 
 
 - **Sqlite**: local DB
 - **ZeroMQ**: messages between the client and the cloud
-- **C**: Programming language
+- **NodeJS**: Programming language for backend
+- **React with Tailwind**: Programming language for frontend
 - **SQLite API**: Conection with the DB
 
 The CRDTS must be made by us. Some other framework may be needed in the future. 
