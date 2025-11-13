@@ -5,5 +5,15 @@
     "sqlite3": "^5.1.7",
     "typeorm": "^0.3.27",
     "zeromq": "^6.5.0"
+  },
+  "scripts": {
+    "start:server": "node server/server.js",
+    "start:client": "node client/client.js",
+    "start:ui": "npm --prefix ui run dev",
+    "start:proxy": "node proxy/proxy.js",
+    "start:all": "concurrently \"npm run start:server\" \"npm run start:proxy\" \"npm run start:client\" \"npm run start:ui\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
