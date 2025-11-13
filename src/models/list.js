@@ -1,20 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm"
 import { Product } from "./product";
 
-@Entity()
 export class List{
-    @PrimaryGeneratedColumn()
-    id;
-
-    @Column()
-    name;
-
-    @Column()
-    globalId;
-
-    @Column()
-    softDelete;
-
-    @OneToMany(() => Product, (product) => product.list)
-    products;
+    constructor(id, name, globalId, softDelete){
+        this.id = id;
+        this.name = name;
+        this.globalId = globalId;
+        this.softDelete = softDelete;
+    }
 }

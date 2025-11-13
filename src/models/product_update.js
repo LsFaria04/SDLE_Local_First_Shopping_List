@@ -1,24 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm"
-import { List } from "./list";
-import { Product } from "./product";
-
-@Entity()
 export class ProductUpdate{
-    @PrimaryGeneratedColumn()
-    id;
+    constructor(id, product_id, quantity_diff, bought_diff, is_sync){
+        this.id = id;
+        this.product_id = product_id;
+        this.quantity_diff = quantity_diff;
+        this.bought_diff = bought_diff;
+        this.is_sync = is_sync;
+    }
 
-    @Column()
-    product_id;
-
-    @Column()
-    quantity_diff;
-
-    @Column()
-    bought_diff;
-
-    @Column()
-    is_sync;
-
-    @ManyToOne(() => Product, (product) => product.updates)
-    product;
 }
