@@ -15,3 +15,19 @@ async function testDBConnection(){
 }
 
 testDBConnection();
+
+const zmq = require("zeromq");
+
+async function runClient() {
+  const sock = new zmq.Dealer({ routingId: "client-1" });
+  await sock.connect("tcp://localhost:5555");
+
+  const productId = "product-123";
+  await sock.send(productId);
+
+  for await (const [msg] of sock) {
+    console.log(`Client received reply: ${msg.toString()}`);
+  }
+}
+
+runClient();

@@ -11,9 +11,10 @@
     "start:client": "node client/client.js",
     "start:ui": "npm --prefix ui run dev",
     "start:proxy": "node proxy/proxy.js",
-    "start:all": "concurrently \"npm run start:server\" \"npm run start:proxy\" \"npm run start:client\" \"npm run start:ui\""
+     "start:all": "concurrently \"npm run start:proxy\" \"wait-on tcp:5556 && npm run start:server\" \"wait-on tcp:5555 && npm run start:client\" \"npm run start:ui\""
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "wait-on": "^9.0.3"
   }
 }
