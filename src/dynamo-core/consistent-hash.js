@@ -39,6 +39,31 @@ class ConsistentHashRing {
         return this.ring.get(this.sortedKeys[left % this.sortedKeys.length]);
     }
 
+    getPreferenceList(key, n = 2) {
+        const preferenceList = [];
+        let currentIndex = this.findKeyIndex(this.hash(key));
+        
+        while (preferenceList.length < n) {
+            const node = this.ring.get(this.sortedKeys[currentIndex]);
+            if (!preferenceList.includes(node)) {
+                preferenceList.push(node);
+            }
+            currentIndex = (currentIndex + 1) % this.sortedKeys.length;
+        }
+        
+        return preferenceList;
+    }
+    
+    findKeyIndex(hash) {
+        let left = 0, right = this.sortedKeys.length - 1;
+        while (left <= right) {
+            const mid = Math.floor((left + right) / 2);
+            if (this.sortedKeys[mid] >= hash) return mid;
+            left = mid + 1;
+        }
+        return 0;
+    }
+
     removeNode(node) {
         for (let i = 0; i < this.virtualNodesPerNode; i++) {
             const key = this.hash(`${node}:${i}`);
