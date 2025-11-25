@@ -2,7 +2,6 @@ DROP TABLE IF EXISTS list;
 DROP TABLE IF EXISTS product;
 DROP TABLE IF EXISTS product_update;
 
-
 CREATE TABLE list(
     id INT PRIMARY KEY,
     name TEXT NOT NULL,
