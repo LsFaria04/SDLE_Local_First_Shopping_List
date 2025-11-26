@@ -1,4 +1,5 @@
 const ConsistentHashRing = require('./consistent-hash-ring');
+const VectorClock = require('./vector_clock');
 
 /*
     Quorum Coordinator with Sloppy Quorum and Hinted Handoff:
