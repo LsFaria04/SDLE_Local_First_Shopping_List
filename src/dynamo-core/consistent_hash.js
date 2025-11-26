@@ -1,3 +1,13 @@
+/*
+    Consistent hash ring:
+    - automatically distributes shopping lists across available servers
+    - a certain list will always map to the same server unless servers are added/removed
+    - allows addition/removal of servers without data loss
+
+    How it works:
+    Tells the client where it should save each list
+*/
+
 class ConsistentHashRing {
     constructor(nodes = [], virtualNodesPerNode = 10) {
         this.ring = new Map();
@@ -79,3 +89,5 @@ class ConsistentHashRing {
         return crypto.createHash('md5').update(str).digest('hex');
     }
 }
+
+module.exports = ConsistentHashRing;
