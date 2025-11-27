@@ -1,4 +1,6 @@
-class ConsistentHashRing {
+import crypto from "crypto";
+
+export class ConsistentHashRing {
     constructor(nodes = [], virtualNodesPerNode = 10) {
         this.ring = new Map();
         this.virtualNodesPerNode = virtualNodesPerNode;

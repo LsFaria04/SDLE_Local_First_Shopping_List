@@ -1,33 +1,32 @@
-async function testDBConnection(){
-    // Import sqlite3
-    const sqlite3 = require('sqlite3').verbose();
-    const path = require("path");
-    const dbPath = path.resolve(__dirname, "../database/local_db.db");
+import net from "node:net";
 
-    // Open a database file (creates it if it doesn't exist)
-    const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('❌ Could not connect to database', err);
-    } else {
-        console.log('✅ Connected to SQLite database');
+function runClient(identity) {
+  const client = net.createConnection({ host: "127.0.0.1", port: 5555 }, () => {
+    console.log(`${identity} connected to proxy`);
+
+    const productId = "product-123";
+
+    // Send request as JSON
+    const message = JSON.stringify({ clientId: identity, productId });
+    client.write(message);
+  });
+
+  client.on("data", (data) => {
+    try {
+      const reply = data.toString();
+      console.log(`${identity} received reply: ${reply}`);
+    } catch (err) {
+      console.error("Error parsing reply:", err);
     }
-    });
+  });
+
+  client.on("end", () => {
+    console.log(`${identity} disconnected from proxy`);
+  });
+
+  client.on("error", (err) => {
+    console.error(`${identity} connection error:`, err);
+  });
 }
 
-testDBConnection();
-
-const zmq = require("zeromq");
-
-async function runClient() {
-  const sock = new zmq.Dealer({ routingId: "client-1" });
-  await sock.connect("tcp://localhost:5555");
-
-  const productId = "product-123";
-  await sock.send(productId);
-
-  for await (const [msg] of sock) {
-    console.log(`Client received reply: ${msg.toString()}`);
-  }
-}
-
-runClient();
+runClient("client-1");
