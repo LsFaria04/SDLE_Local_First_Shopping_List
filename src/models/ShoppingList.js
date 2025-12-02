@@ -15,6 +15,9 @@ export default class ShoppingList {
     toString(){
         const items = this.items.read();
         const itemsJson = {
+            replicaId: this.replicaId,
+            listId: this.listId,
+            name: this.name,
             items:[]
         }
         for(const item of items){

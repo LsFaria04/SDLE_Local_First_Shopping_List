@@ -5,15 +5,13 @@ function runClient(identity) {
   //just a test shopping list
   const list = new ShoppingList(1,1,"teste");
   list.addItem("teste", 1);
-  console.log(list.toString())
 
   const client = net.createConnection({ host: "127.0.0.1", port: 5555 }, () => {
     console.log(`${identity} connected to proxy`);
 
-    const productId = "product-123";
 
     // Send request as JSON
-    const message = JSON.stringify({ clientId: identity, productId });
+    const message = JSON.stringify( list );
     client.write(message);
   });
 

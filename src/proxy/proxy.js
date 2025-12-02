@@ -12,17 +12,18 @@ if (cluster.isPrimary) {
       console.log("Client connected");
 
       clientSocket.on("data", (data) => {
-        const productIdStr = data.toString().trim();
-        const node = hashing.getNode(productIdStr);
+        const list = JSON.parse(data.toString().trim());
+        console.log(list)
+        const node = hashing.getNode(list["listId"].toString());
 
-        console.log(`Routing product ${productIdStr} → server-${node}`);
+        console.log(`Routing list with id ${list["listId"]} → server-${node}`);
 
         // Connect to backend server
         const backendSocket = net.createConnection(
           { host: "127.0.0.1", port: 6000 + node }, // each server listens on 6000+id
           () => {
             backendSocket.write(
-              JSON.stringify({ clientId: clientSocket.remotePort, productId: productIdStr })
+              JSON.stringify(list)
             );
           }
         );

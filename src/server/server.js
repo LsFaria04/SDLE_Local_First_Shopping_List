@@ -8,11 +8,11 @@ function runWorker(identity, port) {
       try {
         // Expect JSON: { clientId, productId }
         const msg = JSON.parse(data.toString());
-        console.log(`Worker ${identity} received product ${msg.productId} from client ${msg.clientId}`);
+        console.log(msg)
+        console.log(`Worker ${identity} received list ${msg.listId}`);
 
         // Do work and reply
         const reply = JSON.stringify({
-          clientId: msg.clientId,
           response: `Ack from ${identity}`
         });
 
