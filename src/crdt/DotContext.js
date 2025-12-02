@@ -1,5 +1,5 @@
 
-module.exports = class DotContext {
+export default class DotContext {
 
     constructor(){
         // Compact Causal Context - Map of replica_id -> max counter

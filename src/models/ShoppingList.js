@@ -1,7 +1,7 @@
-const AWORSet = require('../crdt/AWORSet.js');
-const PNCounter = require('../crdt/PNCounter.js');
+import PNCounter from '../crdt/PNCounter.js';
+import AWORSet from '../crdt/AWORSet.js';
 
-module.exports = class ShoppingList {
+export default class ShoppingList {
 
     constructor(replicaId, listId, name){
         this.replicaId = replicaId;
@@ -10,6 +10,25 @@ module.exports = class ShoppingList {
         
         this.items = new AWORSet(replicaId);
         this.quantities = new Map();  // itemName → PNCounter (inc=add, dec=buy)
+    }
+
+    toString(){
+        const items = this.items.read();
+        const itemsJson = {
+            items:[]
+        }
+        for(const item of items){
+            const counter = this.quantities.get(item);
+            const inc = counter.p;
+            const dec = counter.n;
+            itemsJson["items"].push({
+                item: item,
+                inc: inc.read(),
+                dec: dec.read()
+            })
+        }
+
+        return JSON.stringify(itemsJson);
     }
 
     addItem(name, qty = 1){

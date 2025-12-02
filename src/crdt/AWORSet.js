@@ -1,13 +1,14 @@
 //const PNCounter = require('./PNCounter.js'),  Still need to implement PNCOunter
-const dotkernel = require('./DotKernel.js')
+import DotKernel from './DotKernel.js';
 
 
-module.exports = class AWORSet {
+export default class AWORSet {
 
     constructor(id, context = null){
         this.id = id; // Replica ID
-        this.dk = context || new dotkernel(); // Dot kernel with shared causal context
+        this.dk = context || new DotKernel(); // Dot kernel with shared causal context
     }
+
 
     // Reads the current items in the set
     read(){

@@ -1,4 +1,4 @@
-module.exports = class GCounter {
+export default class GCounter {
 
     constructor(id = null){
         this.id = id;
