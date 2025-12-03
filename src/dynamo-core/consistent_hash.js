@@ -8,9 +8,9 @@
     Tells the client where it should save each list
 */
 
-import crypto from "crypto";
+import crypto from "crypto"
 
-export class ConsistentHashRing {
+class ConsistentHashRing {
     constructor(nodes = [], virtualNodesPerNode = 10) {
         this.ring = new Map();
         this.virtualNodesPerNode = virtualNodesPerNode;
