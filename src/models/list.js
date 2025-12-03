@@ -1,5 +1,3 @@
-import { Product } from "./product";
-
 export class List{
     constructor(id, name, globalId, softDelete){
         this.id = id;

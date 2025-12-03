@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const zmq = require("zeromq");
 const sqlite3 = require('sqlite3').verbose();
 const path = require("path");
@@ -67,14 +68,33 @@ class Client {
 
 async function testDBConnection(){
     const dbPath = path.resolve(__dirname, "../database/local_db.db");
+=======
+import net from "node:net";
+import ShoppingList from "../models/ShoppingList.js";
+>>>>>>> 37c7e33aebbed3c5367b4c8de2a75d130119d221
 
-    // Open a database file (creates it if it doesn't exist)
-    const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('❌ Could not connect to database', err);
-    } else {
-        console.log('✅ Connected to SQLite database');
+function runClient(identity) {
+  //just a test shopping list
+  const list = new ShoppingList(1,1,"teste");
+  list.addItem("teste", 1);
+
+  const client = net.createConnection({ host: "127.0.0.1", port: 5555 }, () => {
+    console.log(`${identity} connected to proxy`);
+
+
+    // Send request as JSON
+    const message = JSON.stringify( list );
+    client.write(message);
+  });
+
+  client.on("data", (data) => {
+    try {
+      const reply = data.toString();
+      console.log(`${identity} received reply: ${reply}`);
+    } catch (err) {
+      console.error("Error parsing reply:", err);
     }
+<<<<<<< HEAD
     });
 
     const client = new Client();
@@ -114,22 +134,17 @@ async function testDBConnection(){
         db.close();
     }
 
+=======
+  });
+
+  client.on("end", () => {
+    console.log(`${identity} disconnected from proxy`);
+  });
+
+  client.on("error", (err) => {
+    console.error(`${identity} connection error:`, err);
+  });
+>>>>>>> 37c7e33aebbed3c5367b4c8de2a75d130119d221
 }
 
-testDBConnection();
-
-const zmq = require("zeromq");
-
-async function runClient() {
-  const sock = new zmq.Dealer({ routingId: "client-1" });
-  await sock.connect("tcp://localhost:5555");
-
-  const productId = "product-123";
-  await sock.send(productId);
-
-  for await (const [msg] of sock) {
-    console.log(`Client received reply: ${msg.toString()}`);
-  }
-}
-
-runClient();
+runClient("client-1");

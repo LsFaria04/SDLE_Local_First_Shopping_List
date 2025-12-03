@@ -1,9 +1,9 @@
 
-const dotContext = require("./DotContext")
+import DotContext from "./DotContext.js";
 
-module.exports = class DotKernel {
+export default class DotKernel {
 
-    constructor(cc = new dotContext()) {
+    constructor(cc = new DotContext()) {
         this.c = cc; // Shared causal context
         this.ds = new Map(); // Dot store: Map of (dot -> item)
     }
