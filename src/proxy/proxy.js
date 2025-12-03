@@ -1,7 +1,6 @@
 const zmq = require("zeromq");
 const crypto = require("crypto");
 
-
 async function runProxy() {
   const frontend = new zmq.Router();
   await frontend.bind("tcp://*:5555"); // clients connect here

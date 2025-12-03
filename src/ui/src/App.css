@@ -1,42 +1,213 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+/* ---- GLOBAL ---- */
+body {
+  font-family: system-ui, sans-serif;
+  background: #f4f6f9;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* ---- HEADER ---- */
+.header {
   text-align: center;
+  margin-bottom: 30px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #2563eb;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.header p {
+  margin: 5px 0;
+  color: #555;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
+/* ---- CARDS ---- */
 .card {
-  padding: 2em;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
-.read-the-docs {
-  color: #888;
+/* ---- NODE SELECTOR ---- */
+.node-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-row select {
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.node-status {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.status-dot {
+  color: #16a34a;
+}
+
+/* ---- LAYOUT ---- */
+.main-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+}
+
+.sidebar h2 {
+  margin-top: 0;
+}
+
+/* ---- LIST SIDEBAR ---- */
+.new-list {
+  display: flex;
+  gap: 8px;
+}
+
+.new-list input {
+  flex: 1;
+  padding: 8px;
+}
+
+.new-list button {
+  padding: 8px 12px;
+}
+
+.list-scroll {
+  margin-top: 15px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.list-card {
+  padding: 10px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: 0.15s;
+}
+
+.list-card:hover {
+  background: #e7e7e7;
+}
+
+.list-card.selected {
+  background: #dbeafe;
+  border-left: 4px solid #2563eb;
+}
+
+/* ---- MAIN PANEL ---- */
+.main {
+  min-height: 400px;
+}
+
+.welcome {
+  text-align: center;
+  padding: 40px;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.new-item {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.new-item input {
+  padding: 8px;
+}
+
+.new-item button {
+  padding: 8px 14px;
+}
+
+/* ---- ITEM CARDS ---- */
+.items {
+  margin-top: 15px;
+}
+
+.item-card {
+  display: flex;
+  justify-content: space-between;
+  background: #fafafa;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.item-actions button {
+  margin-left: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.item-actions .danger {
+  background: #dc2626;
+  color: white;
+}
+
+/* ---- DEBUG ---- */
+.debug {
+  background: #f1f5f9;
+  padding: 10px;
+  margin-top: 20px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* ---- EMPTY STATE ---- */
+.empty {
+  text-align: center;
+  padding: 20px 0;
+  color: #666;
+}
+
+/* ---- LOADING ---- */
+.loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-box {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.spinner {
+  border: 3px solid #ddd;
+  border-top: 3px solid #2563eb;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
