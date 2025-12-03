@@ -3,8 +3,12 @@ import net from "node:net";
 import pkg from 'sqlite3'; //because sqlite3 is a commonJS module
 import { loadLists } from "./database_operations.js";
 import ShoppingList from "../models/ShoppingList.js";
+import {Worker} from "worker_threads";
+import { JsonContains } from "typeorm";
 const { Database } = pkg;
 
+
+let shoppingLists = new Map(); //where all the lists in the server are stored
 /**
  * Main server function. Does the main server work like receiving the requests and making the needed work.
  * @param {string} identity Server id
@@ -20,13 +24,12 @@ async function runWorker(identity, port) {
   }
 
   //initialize the shopping lists (CRDTs)
-  let shoppingLists = await initShoppingLists(db);
-
-  console.log(shoppingLists)
-
+  shoppingLists = await initShoppingLists(db);
   
-  //initialize the database worker
-  //initialize the replication worker
+  //TODO: initialize the database worker (does the main database operations async in a worker)
+  const db_worker = new Worker("./server/database_worker.js", { workerData: { dbPath: `./database/server${identity}.db` }});
+
+  //TODO: initialize the replication worker
 
   const server = net.createServer((socket) => {
     console.log(`Worker ${identity} connected to proxy`);
@@ -35,14 +38,38 @@ async function runWorker(identity, port) {
       try {
         //Json received with the a list from the client
         const msg = JSON.parse(data.toString());
-        console.log(`Worker ${identity} received list ${msg.listId}`);
+        console.log(`Worker ${identity} received list ${msg.list.listId}`);
 
-        // Send reply. Only a simple reply for now
-        const reply = JSON.stringify({
-          response: `Ack from ${identity}`
-        });
+        const type = msg.type;
+        const list = msg.list;
 
-        socket.write(reply);
+
+        //filter the operation by type
+        if(type === "sync"){
+          //sync received list with server lists
+          const syncList = syncLists(list);
+          const reply = JSON.stringify({
+            code: 200,
+            list: syncList
+          });
+          socket.write(reply);
+        }
+        else if(type === "get"){
+          //get list by a provided id
+          const list = getList(list.listId);
+          const reply = JsonContains.stringify({
+            code: 200,
+            list: list
+          })
+        }
+        else{
+          const reply = JSON.stringify({
+            code: 400,
+            message: `Bad request. Unknown type`
+          });
+          socket.write(reply);
+        }
+
       } catch (err) {
         console.error(`Worker ${identity} error parsing message:`, err);
       }
@@ -64,6 +91,29 @@ async function runWorker(identity, port) {
 
 // Run worker with env vars
 runWorker(process.env.SERVER_ID, process.env.PORT);
+
+
+function syncLists(list){
+  console.log("Received sync");
+  /*
+  const serverList = shoppingLists.get(list.listId);
+  if(serverList){
+
+  }
+  else{
+    const newShoppingList = new ShoppingList()
+    shoppingLists.set(list.listId)
+  }*/
+  return list;
+}
+
+
+function getList(listId){
+  console.log("Received get");
+
+}
+
+//Initialization functions -----------------------------------------------
 
 /**
  * Initializes the server local database. If the database does not exists, it is created

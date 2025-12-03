@@ -12,7 +12,7 @@ export default class ShoppingList {
         this.quantities = new Map();  // itemName → PNCounter (inc=add, dec=buy)
     }
 
-    toString(){
+    toJson(){
         const items = this.items.read();
         const itemsJson = {
             replicaId: this.replicaId,
@@ -31,7 +31,7 @@ export default class ShoppingList {
             })
         }
 
-        return JSON.stringify(itemsJson);
+        return itemsJson;
     }
 
     addItem(name, qty = 1){
