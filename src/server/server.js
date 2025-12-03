@@ -1,162 +1,190 @@
 import { existsSync, readFileSync } from "node:fs";
-import net from "node:net";
-import pkg from 'sqlite3'; //because sqlite3 is a commonJS module
+import pkg from "sqlite3"; // sqlite3 is CommonJS
 import { loadLists } from "./database_operations.js";
 import ShoppingList from "../models/ShoppingList.js";
-import {Worker} from "worker_threads";
-import { JsonContains } from "typeorm";
+import { Worker } from "worker_threads";
+import WebSocket, { WebSocketServer } from "ws";
+
 const { Database } = pkg;
 
+let shoppingLists = new Map(); // where all the lists in the server are stored
 
-let shoppingLists = new Map(); //where all the lists in the server are stored
 /**
- * Main server function. Does the main server work like receiving the requests and making the needed work.
+ * Main server function. Handles requests from proxy via WebSocket.
  * @param {string} identity Server id
  * @param {number} port Port used to connect to the server
  */
 async function runWorker(identity, port) {
-  //initialize database
+  // initialize database
   let db = null;
-  try{
+  try {
     db = await initDatabase(identity);
-  } catch(err){
-    console.error(`Could not initialize the database. ${err.message}`)
+  } catch (err) {
+    console.error(`Could not initialize the database. ${err.message}`);
   }
 
-  //initialize the shopping lists (CRDTs)
+  // initialize the shopping lists (CRDTs)
   shoppingLists = await initShoppingLists(db);
-  
-  //TODO: initialize the database worker (does the main database operations async in a worker)
-  const db_worker = new Worker("./server/database_worker.js", { workerData: { dbPath: `./database/server${identity}.db` }});
 
-  //TODO: initialize the replication worker
+  // initialize the database worker
+  const db_worker = new Worker("./server/database_worker.js", {
+    workerData: { dbPath: `./database/server${identity}.db` },
+  });
 
-  const server = net.createServer((socket) => {
+  // TODO: initialize the replication worker
+
+  // WebSocket server
+  const wss = new WebSocketServer({ port });
+
+  wss.on("connection", (ws) => {
     console.log(`Worker ${identity} connected to proxy`);
 
-    socket.on("data", (data) => {
+    ws.on("message", (data) => {
       try {
-        //Json received with the a list from the client
         const msg = JSON.parse(data.toString());
-        console.log(`Worker ${identity} received list ${msg.list.listId}`);
+        console.log(`Worker ${identity} received list ${msg.list?.listId}`);
 
         const type = msg.type;
-        const list = msg.list;
 
+        if (type === "sync") {
+          const list = msg.list;
+          if (!list) {
+            ws.send(
+              JSON.stringify({
+                code: 400,
+                message: "Bad Request. No list provided",
+              })
+            );
+            return;
+          }
 
-        //filter the operation by type
-        if(type === "sync"){
-          //sync received list with server lists
           const syncList = syncLists(list);
-          const reply = JSON.stringify({
-            code: 200,
-            list: syncList
-          });
-          socket.write(reply);
-        }
-        else if(type === "get"){
-          //get list by a provided id
-          const list = getList(list.listId);
-          const reply = JsonContains.stringify({
-            code: 200,
-            list: list
-          })
-        }
-        else{
-          const reply = JSON.stringify({
-            code: 400,
-            message: `Bad request. Unknown type`
-          });
-          socket.write(reply);
-        }
+          ws.send(
+            JSON.stringify({
+              code: 200,
+              list: syncList,
+            })
+          );
+        } else if (type === "get") {
+          const list = getList(msg.listId);
 
+          if (!list) {
+            ws.send(
+              JSON.stringify({
+                code: 404,
+                message: "Bad Request. No list found",
+              })
+            );
+            return;
+          }
+
+          ws.send(
+            JSON.stringify({
+              code: 200,
+              list: list,
+            })
+          );
+        } else {
+          ws.send(
+            JSON.stringify({
+              code: 400,
+              message: "Bad request. Unknown type",
+            })
+          );
+        }
       } catch (err) {
         console.error(`Worker ${identity} error parsing message:`, err);
       }
     });
 
-    socket.on("end", () => {
+    ws.on("close", () => {
       console.log(`Proxy disconnected from worker ${identity}`);
     });
 
-    socket.on("error", (err) => {
+    ws.on("error", (err) => {
       console.error(`Worker ${identity} socket error:`, err);
     });
   });
 
-  server.listen(port, () => {
-    console.log(`Worker ${identity} listening on port ${port}`);
-  });
+  console.log(`Worker ${identity} listening on WebSocket port ${port}`);
 }
 
 // Run worker with env vars
 runWorker(process.env.SERVER_ID, process.env.PORT);
 
+/**
+ * Syncs the server list with the list sent by the client
+ */
+function syncLists(list) {
+  let serverList = shoppingLists.get(list.listId.toString());
 
-function syncLists(list){
-  console.log("Received sync");
-  /*
-  const serverList = shoppingLists.get(list.listId);
-  if(serverList){
-
+  const newShoppingList = new ShoppingList(
+    process.env.SERVER_ID,
+    list.listId,
+    list.name
+  );
+  for (const product of list.items) {
+    newShoppingList.addItem(product.item, product.inc);
+    newShoppingList.markBought(product.item, product.dec);
   }
-  else{
-    const newShoppingList = new ShoppingList()
-    shoppingLists.set(list.listId)
-  }*/
-  return list;
+
+  if (serverList) {
+    serverList.merge(newShoppingList);
+    shoppingLists.set(list.listId, serverList);
+  } else {
+    shoppingLists.set(list.listId, newShoppingList);
+    serverList = newShoppingList;
+  }
+  return serverList;
 }
-
-
-function getList(listId){
-  console.log("Received get");
-
-}
-
-//Initialization functions -----------------------------------------------
 
 /**
- * Initializes the server local database. If the database does not exists, it is created
- * @param {string} identity Server id
- * @returns Database connection
+ * Gets a list from the server or returns undefined if not found
  */
-function initDatabase(identity){
-    return new Promise((resolve, reject) => {
-      const dbPath = `./database/server${identity}.db`;
-      let db = new Database(dbPath);
+function getList(listId) {
+  return shoppingLists.get(listId);
+}
 
-      if (existsSync(dbPath)) {
-        return resolve(db);
+/**
+ * Initializes the server local database
+ */
+function initDatabase(identity) {
+  return new Promise((resolve, reject) => {
+    const dbPath = `./database/server${identity}.db`;
+    let db = new Database(dbPath);
+
+    if (existsSync(dbPath)) {
+      return resolve(db);
+    }
+
+    const schema = readFileSync("./database/schema.sql", "utf8");
+
+    db.exec(schema, (err) => {
+      if (err) {
+        return reject(new Error(err.message));
       }
-
-      // read the schema to initialize the db
-      const schema = readFileSync("./database/schema.sql", "utf8");
-
-      db.exec(schema, (err) => {
-        if (err) {
-          return reject(new Error(err.message));
-        }
-        console.log("Schema executed successfully");
-        resolve(db);
-      });
+      console.log("Schema executed successfully");
+      resolve(db);
     });
+  });
 }
 
 /**
- * Initializes the shopping lists (CRDTs) to be used by the server using the stored information in hte local database
- * @param {Database} db Database connection
- * @returns Map ListID => Shopping list
+ * Initializes shopping lists from DB
  */
-async function initShoppingLists(db){
+async function initShoppingLists(db) {
   const lists_products = await loadLists(db);
-  let shoppingLists = new Map(); //hash map of list ids to shopping list
+  let shoppingLists = new Map();
 
-  //Create the shopping lists
-  for (const {list, products} of lists_products){
-    const shoppingList = new ShoppingList(process.env.SERVER_ID, list.globalId,list.name);
-    for(const product of products){
+  for (const { list, products } of lists_products) {
+    const shoppingList = new ShoppingList(
+      process.env.SERVER_ID,
+      list.globalId,
+      list.name
+    );
+    for (const product of products) {
       shoppingList.addItem(product.name, product.quantity);
-      shoppingList.markBought(product.name, product.bought)
+      shoppingList.markBought(product.name, product.bought);
     }
     shoppingLists.set(list.globalId, shoppingList);
   }
