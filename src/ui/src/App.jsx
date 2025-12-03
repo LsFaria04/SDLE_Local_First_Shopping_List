@@ -12,7 +12,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState('all-lists') // 'all-lists' or 'list-detail'
 
-  const currentUrl = 'http://localhost:3000' // Fixed URL
+const currentUrl = 'http://localhost:3000'
 
   // Load all lists on startup
   useEffect(() => {
