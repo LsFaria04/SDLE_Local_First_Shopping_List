@@ -13,7 +13,6 @@ if (cluster.isPrimary) {
 
       clientSocket.on("data", (data) => {
         const list = JSON.parse(data.toString().trim());
-        console.log(list)
         const node = hashing.getNode(list["listId"].toString());
 
         console.log(`Routing list with id ${list["listId"]} → server-${node}`);
