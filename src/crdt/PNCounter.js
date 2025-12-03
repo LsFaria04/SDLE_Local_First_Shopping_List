@@ -1,7 +1,7 @@
-const GCounter = require('./GCounter.js')
 
+import GCounter from './GCounter.js';
 
-module.exports = class PNCounter {
+export default class PNCounter {
 
     constructor(id = null){
 

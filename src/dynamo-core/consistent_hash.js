@@ -8,6 +8,7 @@
     Tells the client where it should save each list
 */
 
+import crypto from "crypto";
 class ConsistentHashRing {
     constructor(nodes = [], virtualNodesPerNode = 10) {
         this.ring = new Map();
