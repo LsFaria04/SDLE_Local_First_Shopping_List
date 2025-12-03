@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import net from "node:net";
 import pkg from 'sqlite3'; //because sqlite3 is a commonJS module
+import { loadLists } from "./database_operations.js";
+import ShoppingList from "../models/ShoppingList.js";
 const { Database } = pkg;
 
 /**
@@ -8,15 +10,21 @@ const { Database } = pkg;
  * @param {string} identity Server id
  * @param {number} port Port used to connect to the server
  */
-function runWorker(identity, port) {
+async function runWorker(identity, port) {
   //initialize database
+  let db = null;
   try{
-    const db = initDatabase(identity);
+    db = await initDatabase(identity);
   } catch(err){
     console.error(`Could not initialize the database. ${err.message}`)
   }
 
-  //initialize the shopping lists
+  //initialize the shopping lists (CRDTs)
+  let shoppingLists = await initShoppingLists(db);
+
+  console.log(shoppingLists)
+
+  
   //initialize the database worker
   //initialize the replication worker
 
@@ -63,32 +71,45 @@ runWorker(process.env.SERVER_ID, process.env.PORT);
  * @returns Database connection
  */
 function initDatabase(identity){
-  const dbPath = `./database/server${identity}_db`;
-  let db = null;
-  try{
-    //See if the database already exists. If not, create it
-    if(existsSync(dbPath)){
-      db = new Database(dbPath);
-    }
-    else{
-      db = new Database(dbPath);
+    return new Promise((resolve, reject) => {
+      const dbPath = `./database/server${identity}.db`;
+      let db = new Database(dbPath);
 
-      //read the schema to initialize the db
-      const schema = readFileSync("./database/schema.sql", 'utf8');
+      if (existsSync(dbPath)) {
+        return resolve(db);
+      }
 
-      db.exec(schema,
-        (err) => {
-              if (err) {
-                //Trhow the error to be handled by the main server function
-                throw new Error(err.message);
-              }
-          }
-      );
+      // read the schema to initialize the db
+      const schema = readFileSync("./database/schema.sql", "utf8");
+
+      db.exec(schema, (err) => {
+        if (err) {
+          return reject(new Error(err.message));
+        }
+        console.log("Schema executed successfully");
+        resolve(db);
+      });
+    });
+}
+
+/**
+ * Initializes the shopping lists (CRDTs) to be used by the server using the stored information in hte local database
+ * @param {Database} db Database connection
+ * @returns Map ListID => Shopping list
+ */
+async function initShoppingLists(db){
+  const lists_products = await loadLists(db);
+  let shoppingLists = new Map(); //hash map of list ids to shopping list
+
+  //Create the shopping lists
+  for (const {list, products} of lists_products){
+    const shoppingList = new ShoppingList(process.env.SERVER_ID, list.globalId,list.name);
+    for(const product of products){
+      shoppingList.addItem(product.name, product.quantity);
+      shoppingList.markBought(product.name, product.bought)
     }
-  } catch(err){
-    //The error will be handle by the main server function
-    throw err;
+    shoppingLists.set(list.globalId, shoppingList);
   }
 
-  return db;
+  return shoppingLists;
 }
