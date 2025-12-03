@@ -15,5 +15,6 @@ CREATE TABLE product(
     quantity INT NOT NULL DEFAULT 1 CHECK(quantity > 0),
     bought INT NOT NULL DEFAULT 0 CHECK(bought >= 0),
     soft_delete BOOLEAN NOT NULL DEFAULT 0,
-    list_id REFERENCES list(id)  NOT NULL
+    list_id REFERENCES list(id)  NOT NULL,
+    UNIQUE(name, list_id)
 );

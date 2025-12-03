@@ -65,6 +65,10 @@ async function runWorker(identity, port) {
               list: syncList,
             })
           );
+
+          //update the list in the database
+          db_worker.postMessage({type: "update", list: syncList.toJson()});
+
         } else if (type === "get") {
           const list = getList(msg.listId);
 
@@ -177,6 +181,7 @@ async function initShoppingLists(db) {
   let shoppingLists = new Map();
 
   for (const { list, products } of lists_products) {
+    console.log(products)
     const shoppingList = new ShoppingList(
       process.env.SERVER_ID,
       list.globalId,
