@@ -1,5 +1,4 @@
-// App.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 function App() {
@@ -10,14 +9,76 @@ function App() {
   const [newListName, setNewListName] = useState('')
   const [joinListId, setJoinListId] = useState('')
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState('all-lists') // 'all-lists' or 'list-detail'
+  const [view, setView] = useState('all-lists')
+  const [connected, setConnected] = useState(false)
 
-const currentUrl = 'http://localhost:3000'
+  const socket = useRef(null)
+  const pendingRequests = useRef(new Map())
+  const requestIdCounter = useRef(0)
 
-  // Load all lists on startup
+  // Connect to proxy (same pattern as client.js)
   useEffect(() => {
-    loadAllLists()
+    socket.current = new WebSocket("ws://127.0.0.1:5555")
+
+    socket.current.onopen = () => {
+      console.log("Connected to proxy")
+      setConnected(true)
+      loadAllLists()
+    }
+
+    socket.current.onmessage = (event) => {
+      try {
+        const reply = JSON.parse(event.data)
+        console.log("Received reply:", reply)
+        
+        // Resolve pending request if it has a requestId
+        if (reply.requestId && pendingRequests.current.has(reply.requestId)) {
+          const { resolve } = pendingRequests.current.get(reply.requestId)
+          pendingRequests.current.delete(reply.requestId)
+          resolve(reply)
+        }
+      } catch (err) {
+        console.error("Error parsing reply:", err)
+      }
+    }
+
+    socket.current.onclose = () => {
+      console.log("Disconnected from proxy")
+      setConnected(false)
+    }
+
+    socket.current.onerror = (err) => {
+      console.error("Connection error:", err)
+      setConnected(false)
+    }
+
+    return () => {
+      socket.current?.close()
+    }
   }, [])
+
+  // Send message and wait for response (helper function)
+  const sendMessage = (message) => {
+    return new Promise((resolve, reject) => {
+      if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
+        return reject(new Error("Not connected"))
+      }
+
+      const requestId = ++requestIdCounter.current
+      pendingRequests.current.set(requestId, { resolve, reject })
+
+      const msgWithId = { ...message, requestId }
+      socket.current.send(JSON.stringify(msgWithId))
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (pendingRequests.current.has(requestId)) {
+          pendingRequests.current.delete(requestId)
+          reject(new Error("Request timeout"))
+        }
+      }, 10000)
+    })
+  }
 
   // Load all available lists
   const loadAllLists = async () => {
@@ -49,9 +110,21 @@ const currentUrl = 'http://localhost:3000'
 
   const fetchList = async (listId) => {
     try {
-      const response = await fetch(`${currentUrl}/lists/${listId}`)
-      if (response.ok) {
-        return await response.json()
+      const response = await sendMessage({
+        type: 'get',
+        listId: listId
+      })
+      
+      if (response.code === 200 && response.list) {
+        return {
+          listId: response.list.listId,
+          name: response.list.name,
+          items: response.list.items.map(item => ({
+            name: item.item,
+            quantity: item.inc,
+            bought: item.dec
+          }))
+        }
       }
       return null
     } catch (error) {
@@ -79,20 +152,20 @@ const currentUrl = 'http://localhost:3000'
     setLoading(true)
     try {
       const listId = newListName.toLowerCase().replace(/\s+/g, '-')
-      const response = await fetch(`${currentUrl}/lists`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          listId, 
-          name: newListName 
-        })
+      const response = await sendMessage({
+        type: 'sync',
+        list: {
+          listId,
+          name: newListName,
+          items: []
+        }
       })
-
-      if (!response.ok) throw new Error('Failed to create list')
       
-      await loadAllLists()
-      setNewListName('')
-      alert(`List "${newListName}" created successfully!`)
+      if (response.code === 200) {
+        await loadAllLists()
+        setNewListName('')
+        alert(`List "${newListName}" created successfully!`)
+      }
       
     } catch (error) {
       alert(`Error creating list: ${error.message}`)
@@ -132,18 +205,13 @@ const currentUrl = 'http://localhost:3000'
 
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists/${listId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) throw new Error('Failed to delete list')
-      
+      // Remove from UI (no backend delete endpoint yet)
       setLists(prev => prev.filter(list => list.listId !== listId))
       if (currentList?.listId === listId) {
         setCurrentList(null)
         setView('all-lists')
       }
-      alert(`List "${listName}" deleted successfully!`)
+      alert(`List "${listName}" removed from your view!`)
       
     } catch (error) {
       alert(`Error deleting list: ${error.message}`)
@@ -153,9 +221,9 @@ const currentUrl = 'http://localhost:3000'
   }
 
   const shareList = (listId, listName) => {
-    const shareUrl = `${window.location.origin}/list/${listId}`
-    navigator.clipboard.writeText(shareUrl)
-    alert(`Share link for "${listName}" copied to clipboard!\n\n${shareUrl}`)
+    // Share the listId so others can join
+    navigator.clipboard.writeText(listId)
+    alert(`List ID for "${listName}" copied to clipboard!\n\nShare this ID: ${listId}`)
   }
 
   const addItem = async () => {
@@ -163,20 +231,25 @@ const currentUrl = 'http://localhost:3000'
 
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists/${currentList.listId}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          itemName: newItem, 
-          quantity: parseInt(newQuantity) || 1 
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to add item')
+      const updatedItems = [
+        ...currentList.items,
+        { item: newItem, inc: parseInt(newQuantity) || 1, dec: 0 }
+      ]
       
-      await loadList(currentList.listId)
-      setNewItem('')
-      setNewQuantity(1)
+      const response = await sendMessage({
+        type: 'sync',
+        list: {
+          listId: currentList.listId,
+          name: currentList.name,
+          items: updatedItems
+        }
+      })
+      
+      if (response.code === 200) {
+        await loadList(currentList.listId)
+        setNewItem('')
+        setNewQuantity(1)
+      }
       
     } catch (error) {
       alert(`Error adding item: ${error.message}`)
@@ -188,18 +261,24 @@ const currentUrl = 'http://localhost:3000'
   const increaseNeeded = async (itemName) => {
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists/${currentList.listId}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          itemName, 
-          quantity: 1 
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to update quantity')
+      const updatedItems = currentList.items.map(item =>
+        item.name === itemName
+          ? { item: item.name, inc: item.quantity + 1, dec: item.bought }
+          : { item: item.name, inc: item.quantity, dec: item.bought }
+      )
       
-      await loadList(currentList.listId)
+      const response = await sendMessage({
+        type: 'sync',
+        list: {
+          listId: currentList.listId,
+          name: currentList.name,
+          items: updatedItems
+        }
+      })
+      
+      if (response.code === 200) {
+        await loadList(currentList.listId)
+      }
       
     } catch (error) {
       alert(`Error: ${error.message}`)
@@ -211,18 +290,24 @@ const currentUrl = 'http://localhost:3000'
   const increaseBought = async (itemName) => {
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists/${currentList.listId}/bought`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          itemName, 
-          quantity: 1 
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to mark item as bought')
+      const updatedItems = currentList.items.map(item =>
+        item.name === itemName
+          ? { item: item.name, inc: item.quantity, dec: item.bought + 1 }
+          : { item: item.name, inc: item.quantity, dec: item.bought }
+      )
       
-      await loadList(currentList.listId)
+      const response = await sendMessage({
+        type: 'sync',
+        list: {
+          listId: currentList.listId,
+          name: currentList.name,
+          items: updatedItems
+        }
+      })
+      
+      if (response.code === 200) {
+        await loadList(currentList.listId)
+      }
       
     } catch (error) {
       alert(`Error: ${error.message}`)
@@ -234,13 +319,22 @@ const currentUrl = 'http://localhost:3000'
   const removeItem = async (itemName) => {
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists/${currentList.listId}/items/${itemName}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) throw new Error('Failed to remove item')
+      const updatedItems = currentList.items
+        .filter(item => item.name !== itemName)
+        .map(item => ({ item: item.name, inc: item.quantity, dec: item.bought }))
       
-      await loadList(currentList.listId)
+      const response = await sendMessage({
+        type: 'sync',
+        list: {
+          listId: currentList.listId,
+          name: currentList.name,
+          items: updatedItems
+        }
+      })
+      
+      if (response.code === 200) {
+        await loadList(currentList.listId)
+      }
       
     } catch (error) {
       alert(`Error removing item: ${error.message}`)
@@ -260,6 +354,11 @@ const currentUrl = 'http://localhost:3000'
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold text-blue-600 mb-2">🛒 Listify</h1>
         <p className="text-gray-600">Collaborative shopping lists made easy</p>
+        <div className="mt-2">
+          <span className={`inline-block px-3 py-1 rounded-full text-sm ${connected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+            {connected ? '● Connected' : '● Disconnected'}
+          </span>
+        </div>
       </header>
 
       {/* All Lists View */}

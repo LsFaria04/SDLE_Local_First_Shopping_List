@@ -92,4 +92,4 @@ class ConsistentHashRing {
     }
 }
 
-module.exports = ConsistentHashRing;
+export default ConsistentHashRing;
