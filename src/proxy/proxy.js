@@ -1,5 +1,5 @@
 import cluster from "cluster";
-import { ConsistentHashRing } from "../dynamo-core/consistent-hash.js";
+import { ConsistentHashRing } from "../dynamo-core/consistent_hash.js";
 import { randomUUID } from "node:crypto";
 import WebSocket, { WebSocketServer } from "ws";
 

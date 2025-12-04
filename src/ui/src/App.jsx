@@ -23,22 +23,9 @@ const currentUrl = 'http://localhost:3000'
   const loadAllLists = async () => {
     setLoading(true)
     try {
-      // In a real app, you'd have an endpoint to get all lists
-      // For now, we'll use the example lists approach
-      const exampleLists = ['family-list', 'work-list', 'party-list']
-      const loadedLists = []
-      
-      for (const listId of exampleLists) {
-        try {
-          const list = await fetchList(listId)
-          if (list) {
-            loadedLists.push(list)
-          }
-        } catch (error) {
-          // List doesn't exist yet - ignore
-        }
-      }
-      
+      const response = await fetch(`${currentUrl}/lists`)
+      const data = await response.json()
+      const loadedLists = data.lists || []
       setLists(loadedLists)
     } catch (error) {
       console.error('Error loading lists:', error)
@@ -51,7 +38,8 @@ const currentUrl = 'http://localhost:3000'
     try {
       const response = await fetch(`${currentUrl}/lists/${listId}`)
       if (response.ok) {
-        return await response.json()
+        const data = await response.json()
+        return data.list // Extract the list from the response
       }
       return null
     } catch (error) {
@@ -64,6 +52,7 @@ const currentUrl = 'http://localhost:3000'
     setLoading(true)
     try {
       const list = await fetchList(listId)
+      console.log('Loaded list:', list)
       setCurrentList(list)
       setView('list-detail')
     } catch (error) {
@@ -160,6 +149,8 @@ const currentUrl = 'http://localhost:3000'
 
   const addItem = async () => {
     if (!newItem.trim() || !currentList) return
+
+    console.log('List id:', currentList.listId);
 
     setLoading(true)
     try {
@@ -436,17 +427,17 @@ const currentUrl = 'http://localhost:3000'
                 {currentList.items.map((item, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <div className="flex-1">
-                      <div className="font-semibold text-lg text-gray-800 mb-1">{item.name}</div>
+                      <div className="font-semibold text-lg text-gray-800 mb-1">{item.item}</div>
                       <div className="text-sm text-gray-600">
-                        <span className="font-medium">Need: {Math.max(0, item.quantity - item.bought)}</span> • 
-                        <span className="font-medium text-green-600"> Bought: {item.bought}</span> • 
-                        <span className="font-medium text-blue-600"> Total: {item.quantity}</span>
+                        <span className="font-medium">Need: {Math.max(0, item.inc - item.dec)}</span> • 
+                        <span className="font-medium text-green-600"> Bought: {item.dec}</span> • 
+                        <span className="font-medium text-blue-600"> Total: {item.inc}</span>
                       </div>
                     </div>
                     
                     <div className="flex gap-2">
                       <button
-                        onClick={() => increaseNeeded(item.name)}
+                        onClick={() => increaseNeeded(item.item)}
                         className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center gap-1"
                         title="Add one more needed"
                       >
@@ -455,7 +446,7 @@ const currentUrl = 'http://localhost:3000'
                       </button>
                       
                       <button
-                        onClick={() => increaseBought(item.name)}
+                        onClick={() => increaseBought(item.item)}
                         className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 flex items-center gap-1"
                         title="Mark one as bought"
                       >
@@ -464,7 +455,7 @@ const currentUrl = 'http://localhost:3000'
                       </button>
                       
                       <button
-                        onClick={() => removeItem(item.name)}
+                        onClick={() => removeItem(item.item)}
                         className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
                         title="Remove item"
                       >
