@@ -10,81 +10,19 @@ function App() {
   const [joinListId, setJoinListId] = useState('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState('all-lists')
-  const [connected, setConnected] = useState(false)
 
-  const socket = useRef(null)
-  const pendingRequests = useRef(new Map())
-  const requestIdCounter = useRef(0)
+  const API_URL = 'http://localhost:3000'
 
-  // Connect to proxy (same pattern as client.js)
+  // Load lists on mount
   useEffect(() => {
-    socket.current = new WebSocket("ws://127.0.0.1:5555")
-
-    socket.current.onopen = () => {
-      console.log("Connected to proxy")
-      setConnected(true)
-      loadAllLists()
-    }
-
-    socket.current.onmessage = (event) => {
-      try {
-        const reply = JSON.parse(event.data)
-        console.log("Received reply:", reply)
-        
-        // Resolve pending request if it has a requestId
-        if (reply.requestId && pendingRequests.current.has(reply.requestId)) {
-          const { resolve } = pendingRequests.current.get(reply.requestId)
-          pendingRequests.current.delete(reply.requestId)
-          resolve(reply)
-        }
-      } catch (err) {
-        console.error("Error parsing reply:", err)
-      }
-    }
-
-    socket.current.onclose = () => {
-      console.log("Disconnected from proxy")
-      setConnected(false)
-    }
-
-    socket.current.onerror = (err) => {
-      console.error("Connection error:", err)
-      setConnected(false)
-    }
-
-    return () => {
-      socket.current?.close()
-    }
+    loadAllLists()
   }, [])
-
-  // Send message and wait for response (helper function)
-  const sendMessage = (message) => {
-    return new Promise((resolve, reject) => {
-      if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
-        return reject(new Error("Not connected"))
-      }
-
-      const requestId = ++requestIdCounter.current
-      pendingRequests.current.set(requestId, { resolve, reject })
-
-      const msgWithId = { ...message, requestId }
-      socket.current.send(JSON.stringify(msgWithId))
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (pendingRequests.current.has(requestId)) {
-          pendingRequests.current.delete(requestId)
-          reject(new Error("Request timeout"))
-        }
-      }, 10000)
-    })
-  }
 
   // Load all available lists
   const loadAllLists = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`${currentUrl}/lists`)
+      const response = await fetch(`${API_URL}/lists`)
       const data = await response.json()
       const loadedLists = data.lists || []
       setLists(loadedLists)
@@ -97,7 +35,7 @@ function App() {
 
   const fetchList = async (listId) => {
     try {
-      const response = await fetch(`${currentUrl}/lists/${listId}`)
+      const response = await fetch(`${API_URL}/lists/${listId}`)
       if (response.ok) {
         const data = await response.json()
         return data.list // Extract the list from the response
@@ -129,19 +67,19 @@ function App() {
     setLoading(true)
     try {
       const listId = newListName.toLowerCase().replace(/\s+/g, '-')
-      const response = await sendMessage({
-        type: 'sync',
-        list: {
-          listId,
-          name: newListName,
-          items: []
-        }
+      const response = await fetch(`${API_URL}/lists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listId, name: newListName })
       })
       
-      if (response.code === 200) {
+      if (response.ok) {
         await loadAllLists()
         setNewListName('')
         alert(`List "${newListName}" created successfully!`)
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create list')
       }
       
     } catch (error) {
@@ -206,28 +144,21 @@ function App() {
   const addItem = async () => {
     if (!newItem.trim() || !currentList) return
 
-    console.log('List id:', currentList.listId);
-
     setLoading(true)
     try {
-      const updatedItems = [
-        ...currentList.items,
-        { item: newItem, inc: parseInt(newQuantity) || 1, dec: 0 }
-      ]
-      
-      const response = await sendMessage({
-        type: 'sync',
-        list: {
-          listId: currentList.listId,
-          name: currentList.name,
-          items: updatedItems
-        }
+      const response = await fetch(`${API_URL}/lists/${currentList.listId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemName: newItem, quantity: parseInt(newQuantity) || 1 })
       })
       
-      if (response.code === 200) {
+      if (response.ok) {
         await loadList(currentList.listId)
         setNewItem('')
         setNewQuantity(1)
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to add item')
       }
       
     } catch (error) {
@@ -240,23 +171,17 @@ function App() {
   const increaseNeeded = async (itemName) => {
     setLoading(true)
     try {
-      const updatedItems = currentList.items.map(item =>
-        item.name === itemName
-          ? { item: item.name, inc: item.quantity + 1, dec: item.bought }
-          : { item: item.name, inc: item.quantity, dec: item.bought }
-      )
-      
-      const response = await sendMessage({
-        type: 'sync',
-        list: {
-          listId: currentList.listId,
-          name: currentList.name,
-          items: updatedItems
-        }
+      const response = await fetch(`${API_URL}/lists/${currentList.listId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemName, quantity: 1 })
       })
       
-      if (response.code === 200) {
+      if (response.ok) {
         await loadList(currentList.listId)
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to increase quantity')
       }
       
     } catch (error) {
@@ -269,23 +194,17 @@ function App() {
   const increaseBought = async (itemName) => {
     setLoading(true)
     try {
-      const updatedItems = currentList.items.map(item =>
-        item.name === itemName
-          ? { item: item.name, inc: item.quantity, dec: item.bought + 1 }
-          : { item: item.name, inc: item.quantity, dec: item.bought }
-      )
-      
-      const response = await sendMessage({
-        type: 'sync',
-        list: {
-          listId: currentList.listId,
-          name: currentList.name,
-          items: updatedItems
-        }
+      const response = await fetch(`${API_URL}/lists/${currentList.listId}/bought`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemName })
       })
       
-      if (response.code === 200) {
+      if (response.ok) {
         await loadList(currentList.listId)
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to mark as bought')
       }
       
     } catch (error) {
@@ -298,21 +217,15 @@ function App() {
   const removeItem = async (itemName) => {
     setLoading(true)
     try {
-      const updatedItems = currentList.items
-        .filter(item => item.name !== itemName)
-        .map(item => ({ item: item.name, inc: item.quantity, dec: item.bought }))
-      
-      const response = await sendMessage({
-        type: 'sync',
-        list: {
-          listId: currentList.listId,
-          name: currentList.name,
-          items: updatedItems
-        }
+      const response = await fetch(`${API_URL}/lists/${currentList.listId}/items/${itemName}`, {
+        method: 'DELETE'
       })
       
-      if (response.code === 200) {
+      if (response.ok) {
         await loadList(currentList.listId)
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to remove item')
       }
       
     } catch (error) {
