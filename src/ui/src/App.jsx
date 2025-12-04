@@ -354,11 +354,6 @@ function App() {
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold text-blue-600 mb-2">🛒 Listify</h1>
         <p className="text-gray-600">Collaborative shopping lists made easy</p>
-        <div className="mt-2">
-          <span className={`inline-block px-3 py-1 rounded-full text-sm ${connected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-            {connected ? '● Connected' : '● Disconnected'}
-          </span>
-        </div>
       </header>
 
       {/* All Lists View */}
