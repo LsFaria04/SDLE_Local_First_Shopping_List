@@ -3,9 +3,10 @@ import ShoppingList from "../models/ShoppingList.js";
 
 function runClient(identity) {
   // Just a test shopping list
-  const list = new ShoppingList(1, 1, "teste");
+  const list = new ShoppingList(1, 2, "teste");
   list.addItem("teste", 1);
   list.addItem("product1", 1);
+  list.addItem("product2", 1);
   list.markBought("product1", 1);
 
   // Connect to proxy via WebSocket
