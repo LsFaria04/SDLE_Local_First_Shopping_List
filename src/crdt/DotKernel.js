@@ -101,5 +101,17 @@ export default class DotKernel {
         return res;
     }
 
+    toJson() {
+        return {
+            c: this.c.toJson(),
+            ds: Object.fromEntries(this.ds)
+        };
+    }
+
+    static fromJson(json) {
+        const kernel = new DotKernel(DotContext.fromJson(json.c));
+        kernel.ds = new Map(Object.entries(json.ds));
+        return kernel;
+    }
 
 } 

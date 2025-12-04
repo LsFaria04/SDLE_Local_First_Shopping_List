@@ -96,15 +96,18 @@ export function createList(db, list){
 
                 const actualListId = this.lastID; // local PK from SQLite
 
+                // Use itemsDisplay for database storage (array format)
+                const displayItems = list.itemsDisplay || [];
+                
                 // If no items, resolve immediately
-                if (!list.items || list.items.length === 0) {
+                if (displayItems.length === 0) {
                 return resolve({ listId: actualListId });
                 }
 
-                let remaining = list.items.length;
+                let remaining = displayItems.length;
                 let failed = false;
 
-                for (const item of list.items) {
+                for (const item of displayItems) {
                 db.run(
                     "INSERT INTO product (name, quantity, bought, list_id) VALUES (?, ?, ?, ?)",
                     [item.item, item.inc, item.dec, actualListId],
@@ -151,14 +154,17 @@ export function updateList(db, list){
 
                 const actualListId = row.id;
 
-                if (!list.items || list.items.length === 0) {
+                // Use itemsDisplay for database storage (array format)
+                const displayItems = list.itemsDisplay || [];
+                
+                if (displayItems.length === 0) {
                 return resolve();
                 }
 
-                let remaining = list.items.length;
+                let remaining = displayItems.length;
                 let failed = false;
 
-                for (const item of list.items) {
+                for (const item of displayItems) {
                 db.run(
                     `INSERT INTO product (name, quantity, bought, list_id)
                     VALUES (?, ?, ?, ?)

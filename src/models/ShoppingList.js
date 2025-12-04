@@ -13,25 +13,47 @@ export default class ShoppingList {
     }
 
     toJson(){
-        const items = this.items.read();
-        const itemsJson = {
+
+        // Serialize quantities map
+        const quantitiesJson = {};
+        for (const [itemName, counter] of this.quantities) {
+            quantitiesJson[itemName] = counter.toJson();
+        }
+        return {
             replicaId: this.replicaId,
             listId: this.listId,
             name: this.name,
-            items:[]
-        }
-        for(const item of items){
-            const counter = this.quantities.get(item);
-            const inc = counter.p;
-            const dec = counter.n;
-            itemsJson["items"].push({
-                item: item,
-                inc: inc.read(),
-                dec: dec.read()
-            })
-        }
+            items: this.items.toJson(),        // Full AWORSet state
+            quantities: quantitiesJson,         // Full PNCounter states
+            // Keep backwards-compatible "items" array for UI
+            itemsDisplay: this.getItemsForDisplay()
+        };
+    }
 
-        return itemsJson;
+    static fromJson(json) {
+        const list = new ShoppingList(json.replicaId, json.listId, json.name);
+        list.items = AWORSet.fromJson(json.items);
+        
+        list.quantities = new Map();
+        for (const [itemName, counterJson] of Object.entries(json.quantities)) {
+            list.quantities.set(itemName, PNCounter.fromJson(counterJson, json.replicaId));
+        }
+        
+        return list;
+    }
+
+    getItemsForDisplay() {
+        const items = this.items.read();
+        const result = [];
+        for (const item of items) {
+            const counter = this.quantities.get(item);
+            result.push({
+                item: item,
+                inc: counter ? counter.p.read() : 0,
+                dec: counter ? counter.n.read() : 0
+            });
+        }
+        return result;
     }
 
     addItem(name, qty = 1){

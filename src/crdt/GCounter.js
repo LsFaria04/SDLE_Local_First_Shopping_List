@@ -41,4 +41,14 @@ export default class GCounter {
         }
     }
     
+    toJson() {
+        return Object.fromEntries(this.counters);
+    }
+
+    static fromJson(json, id = null) {
+        const counter = new GCounter(id);
+        counter.counters = new Map(Object.entries(json).map(([k, v]) => [k, Number(v)]));
+        return counter;
+    }
+    
 }

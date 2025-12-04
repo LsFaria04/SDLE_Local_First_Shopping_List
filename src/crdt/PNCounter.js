@@ -37,5 +37,16 @@ export default class PNCounter {
         this.n.join(other.n);
     }
 
+    toJson() {
+        return { p: this.p.toJson(), n: this.n.toJson() };
+    }
+
+    static fromJson(json, id = null) {
+        const counter = new PNCounter(id);
+        counter.p = GCounter.fromJson(json.p, id);
+        counter.n = GCounter.fromJson(json.n, id);
+        return counter;
+    }
+
 
 }
