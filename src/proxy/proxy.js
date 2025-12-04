@@ -1,5 +1,5 @@
 import cluster from "cluster";
-import { ConsistentHashRing } from "../dynamo-core/consistent-hash.js";
+import ConsistentHashRing from "../dynamo-core/consistent_hash.js";
 import { randomUUID } from "node:crypto";
 import WebSocket, { WebSocketServer } from "ws";
 
@@ -24,6 +24,7 @@ if (cluster.isPrimary) {
           return;
         }
 
+        const requestId = message.requestId;
 
         // Decide the node using consistent hashing
         let node = 0;
@@ -45,11 +46,14 @@ if (cluster.isPrimary) {
         const backendSocket = new WebSocket(`ws://127.0.0.1:${6000 + node}`);
 
         backendSocket.on("open", () => {
-          backendSocket.send(JSON.stringify(message));
+          const { requestId: reqId, ...backendMessage } = message;
+          backendSocket.send(JSON.stringify(backendMessage));
         });
 
         backendSocket.on("message", (reply) => {
-          clientSocket.send(reply); // forward reply back to client
+          const response = JSON.parse(reply.toString());
+          response.requestId = requestId;
+          clientSocket.send(JSON.stringify(response));
           backendSocket.close();
         });
 
