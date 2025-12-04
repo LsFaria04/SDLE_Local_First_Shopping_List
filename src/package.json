@@ -4,6 +4,7 @@
     "reflect-metadata": "^0.2.2",
     "sqlite3": "^5.1.7",
     "typeorm": "^0.3.27",
+    "ws": "^8.18.3",
     "zeromq": "^6.5.0"
   },
   "scripts": {
@@ -11,7 +12,7 @@
     "start:client": "node client/client.js",
     "start:ui": "npm --prefix ui run dev",
     "start:proxy": "node proxy/proxy.js",
-     "start:all": "concurrently \"npm run start:proxy\" \"wait-on tcp:5556 && npm run start:server\" \"wait-on tcp:5555 && npm run start:client\" \"npm run start:ui\""
+    "start:all": "concurrently \"npm run start:proxy\" \"wait-on tcp:5556 && npm run start:server\" \"wait-on tcp:5555 && npm run start:client\" \"npm run start:ui\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

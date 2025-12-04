@@ -1,39 +1,43 @@
-import net from "node:net";
+import WebSocket from "ws";
 import ShoppingList from "../models/ShoppingList.js";
 
 function runClient(identity) {
-  //just a test shopping list
-  const list = new ShoppingList(1,null,"teste");
+  // Just a test shopping list
+  const list = new ShoppingList(1, 2, "teste");
   list.addItem("teste", 1);
+  list.addItem("product1", 1);
+  list.addItem("product2", 1);
+  list.markBought("product1", 1);
 
-  const client = net.createConnection({ host: "127.0.0.1", port: 5555 }, () => {
-  console.log(`${identity} connected to proxy`);
+  // Connect to proxy via WebSocket
+  const socket = new WebSocket("ws://127.0.0.1:5555");
 
-    //Message type : "sync" to sync local data with the cloud and "get" to receive a list with a global id shared by another user
+  socket.on("open", () => {
+    console.log(`${identity} connected to proxy`);
 
-    // Send request to test sync message
-    const message = JSON.stringify( {type: "sync", list: list.toJson()} );
-    client.write(message);
+    // Message type: "sync" to sync local data with the cloud
+    const message = { type: "sync", list: list.toJson() };
+    socket.send(JSON.stringify(message));
 
-    //Send request to test get message
-    const message2 = JSON.stringify( {type: "get", listId: "1"} );
-    //client.write(message2);
+    // Message type: "get" to receive a list with a global id shared by another user
+    const message2 = { type: "get", listId: "1" };
+    socket.send(JSON.stringify(message2));
   });
 
-  client.on("data", (data) => {
+  socket.on("message", (data) => {
     try {
-      const reply = data.toString();
-      console.log(`${identity} received reply: ${reply}`);
+      const reply = JSON.parse(data.toString());
+      console.log(`${identity} received reply:`, reply);
     } catch (err) {
       console.error("Error parsing reply:", err);
     }
   });
 
-  client.on("end", () => {
+  socket.on("close", () => {
     console.log(`${identity} disconnected from proxy`);
   });
 
-  client.on("error", (err) => {
+  socket.on("error", (err) => {
     console.error(`${identity} connection error:`, err);
   });
 }

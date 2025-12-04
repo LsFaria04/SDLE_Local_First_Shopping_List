@@ -80,3 +80,111 @@ export function loadProducts(db, listId) {
   });
 }
 
+/**
+ * Creates a new list and inserts it into the database
+ * @param {Database} db Database connection 
+ * @param {*} list  New list
+ * @returns Promise with the results of the operation
+ */
+export function createList(db, list){
+    return new Promise((resolve, reject) => {
+        db.run(
+            "INSERT INTO list (name, globalId) VALUES (?, ?)",
+            [list.name, list.listId],
+            function (err) {
+                if (err) return reject(err);
+
+                const actualListId = this.lastID; // local PK from SQLite
+
+                // If no items, resolve immediately
+                if (!list.items || list.items.length === 0) {
+                return resolve({ listId: actualListId });
+                }
+
+                let remaining = list.items.length;
+                let failed = false;
+
+                for (const item of list.items) {
+                db.run(
+                    "INSERT INTO product (name, quantity, bought, list_id) VALUES (?, ?, ?, ?)",
+                    [item.item, item.inc, item.dec, actualListId],
+                    (itemErr) => {
+                    if (failed) return; // already rejected
+                    if (itemErr) {
+                        failed = true;
+                        return reject(itemErr);
+                    }
+
+                    remaining -= 1;
+                    if (remaining === 0) {
+                        // All items inserted
+                        resolve({ listId: actualListId });
+                    }
+                    }
+                );
+                }
+            }
+        );
+    });
+}
+
+/**
+ * Updates a list with new name and product information
+ * @param {*} db Database connection
+ * @param {*} list List to update
+ * @returns Results of the operation
+ */
+export function updateList(db, list){
+    return new Promise((resolve, reject) => {
+       db.run(
+        "UPDATE list SET name = ? WHERE globalId = ?",
+        [list.name, list.listId],
+        (err) => {
+            if (err) return reject(err);
+
+            db.get(
+            "SELECT id FROM list WHERE globalId = ?",
+            [list.listId],
+            (getErr, row) => {
+                if (getErr) return reject(getErr);
+                if (!row) return reject(new Error("List not found"));
+
+                const actualListId = row.id;
+
+                if (!list.items || list.items.length === 0) {
+                return resolve();
+                }
+
+                let remaining = list.items.length;
+                let failed = false;
+
+                for (const item of list.items) {
+                db.run(
+                    `INSERT INTO product (name, quantity, bought, list_id)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(name, list_id) DO UPDATE SET
+                    quantity = excluded.quantity,
+                    bought   = excluded.bought`,
+                    [item.item, item.inc, item.dec, actualListId],
+                    (itemErr) => {
+                    if (failed) return;
+                    if (itemErr) {
+                        failed = true;
+                        return reject(itemErr);
+                    }
+
+                    remaining -= 1;
+                    if (remaining === 0) {
+                        resolve();
+                    }
+                    }
+                );
+                }
+            }
+            );
+        }
+        );
+    });
+}
+
+
