@@ -237,10 +237,171 @@ app.post("/lists/:listId/bought", (req, res) => {
   res.json({ list: list.toJson() });
 });
 
+// Get online status
+app.get("/status", (req, res) => {
+  res.json({ online: isOnline });
+});
+
 // Toggle online/offline status
 app.post("/toggle-online", (req, res) => {
   isOnline = !isOnline;
   res.json({ online: isOnline });
+});
+
+// Sync with server
+app.post("/sync", async (req, res) => {
+  try {
+    const socket = new WebSocket("ws://127.0.0.1:5555");
+    let syncResults = [];
+    let pendingMessages = 0;
+
+    socket.on("open", () => {
+      console.log("Connected to proxy for sync");
+      isOnline = true;
+
+      // Send all local lists to server
+      localLists.forEach((list) => {
+        pendingMessages++;
+        const message = { type: "sync", list: list.toJson() };
+        socket.send(JSON.stringify(message));
+      });
+
+      // If no lists to sync, close immediately
+      if (pendingMessages === 0) {
+        socket.close();
+      }
+    });
+
+    socket.on("message", (data) => {
+      try {
+        const reply = JSON.parse(data.toString());
+        console.log("Sync reply:", reply);
+        
+        if (reply.code === 200 && reply.list) {
+          // Update local list with globalId from server
+          const serverList = reply.list;
+          if (serverList.listId && localLists.has(serverList.listId)) {
+            const localList = localLists.get(serverList.listId);
+            // Merge server data if needed
+            syncResults.push({ listId: serverList.listId, status: 'synced' });
+          }
+        }
+
+        pendingMessages--;
+        if (pendingMessages === 0) {
+          socket.close();
+        }
+      } catch (err) {
+        console.error("Error parsing sync reply:", err);
+        pendingMessages--;
+        if (pendingMessages === 0) {
+          socket.close();
+        }
+      }
+    });
+
+    socket.on("close", () => {
+      console.log("Disconnected from proxy after sync");
+      res.json({ online: isOnline, syncResults });
+    });
+
+    socket.on("error", (err) => {
+      console.error("Sync connection error:", err);
+      isOnline = false;
+      socket.close();
+      res.status(500).json({ error: "Sync failed", online: false });
+    });
+
+    setTimeout(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+        res.status(408).json({ error: "Sync timeout", online: false });
+      }
+    }, 10000);
+
+  } catch (error) {
+    console.error("Sync error:", error);
+    isOnline = false;
+    res.status(500).json({ error: error.message, online: false });
+  }
+});
+
+// Sync with server
+app.post("/sync", async (req, res) => {
+  try {
+    const socket = new WebSocket("ws://127.0.0.1:5555");
+    let syncResults = [];
+    let pendingMessages = 0;
+
+    socket.on("open", () => {
+      console.log("Connected to proxy for sync");
+      isOnline = true;
+
+      // Send all local lists to server
+      localLists.forEach((list) => {
+        pendingMessages++;
+        const message = { type: "sync", list: list.toJson() };
+        socket.send(JSON.stringify(message));
+      });
+
+      // If no lists to sync, close immediately
+      if (pendingMessages === 0) {
+        socket.close();
+      }
+    });
+
+    socket.on("message", (data) => {
+      try {
+        const reply = JSON.parse(data.toString());
+        console.log("Sync reply:", reply);
+        
+        if (reply.code === 200 && reply.list) {
+          // Update local list with globalId from server
+          const serverList = reply.list;
+          if (serverList.listId && localLists.has(serverList.listId)) {
+            const localList = localLists.get(serverList.listId);
+            // Merge server data if needed
+            syncResults.push({ listId: serverList.listId, status: 'synced' });
+          }
+        }
+
+        pendingMessages--;
+        if (pendingMessages === 0) {
+          socket.close();
+        }
+      } catch (err) {
+        console.error("Error parsing sync reply:", err);
+        pendingMessages--;
+        if (pendingMessages === 0) {
+          socket.close();
+        }
+      }
+    });
+
+    socket.on("close", () => {
+      console.log("Disconnected from proxy after sync");
+      res.json({ online: isOnline, syncResults });
+    });
+
+    socket.on("error", (err) => {
+      console.error("Sync connection error:", err);
+      isOnline = false;
+      socket.close();
+      res.status(500).json({ error: "Sync failed", online: false });
+    });
+
+    setTimeout(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+        res.status(408).json({ error: "Sync timeout", online: false });
+      }
+    }, 10000);
+
+  } catch (error) {
+    console.error("Sync error:", error);
+    isOnline = false;
+    res.status(500).json({ error: error.message, online: false });
+  }
 });
 
 // Initialize database, load lists, then start server

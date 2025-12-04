@@ -8,8 +8,8 @@ function App() {
   const [lists, setLists] = useState([])
   const [newListName, setNewListName] = useState('')
   const [joinListId, setJoinListId] = useState('')
-  const [loading, setLoading] = useState(false)
   const [view, setView] = useState('all-lists')
+  const [syncing, setSyncing] = useState(false)
 
   const API_URL = 'http://localhost:3000'
 
@@ -20,7 +20,6 @@ function App() {
 
   // Load all available lists
   const loadAllLists = async () => {
-    setLoading(true)
     try {
       const response = await fetch(`${API_URL}/lists`)
       const data = await response.json()
@@ -28,8 +27,6 @@ function App() {
       setLists(loadedLists)
     } catch (error) {
       console.error('Error loading lists:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -48,23 +45,19 @@ function App() {
   }
 
   const loadList = async (listId) => {
-    setLoading(true)
     try {
       const list = await fetchList(listId)
       console.log('Loaded list:', list)
       setCurrentList(list)
       setView('list-detail')
     } catch (error) {
-      alert(`Error loading list: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error loading list:', error)
     }
   }
 
   const createList = async () => {
     if (!newListName.trim()) return
 
-    setLoading(true)
     try {
       const listId = newListName.toLowerCase().replace(/\s+/g, '-')
       const response = await fetch(`${API_URL}/lists`, {
@@ -76,23 +69,19 @@ function App() {
       if (response.ok) {
         await loadAllLists()
         setNewListName('')
-        alert(`List "${newListName}" created successfully!`)
       } else {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create list')
       }
       
     } catch (error) {
-      alert(`Error creating list: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error creating list:', error)
     }
   }
 
   const joinList = async () => {
     if (!joinListId.trim()) return
 
-    setLoading(true)
     try {
       const list = await fetchList(joinListId)
       if (list) {
@@ -104,21 +93,17 @@ function App() {
           return prev
         })
         setJoinListId('')
-        alert(`Successfully joined list "${list.name}"!`)
       } else {
-        alert('List not found. Please check the list ID.')
+        console.error('List not found')
       }
     } catch (error) {
-      alert(`Error joining list: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error joining list:', error)
     }
   }
 
   const deleteList = async (listId, listName) => {
     if (!window.confirm(`Are you sure you want to delete "${listName}"?`)) return
 
-    setLoading(true)
     try {
       // Remove from UI (no backend delete endpoint yet)
       setLists(prev => prev.filter(list => list.listId !== listId))
@@ -126,112 +111,139 @@ function App() {
         setCurrentList(null)
         setView('all-lists')
       }
-      alert(`List "${listName}" removed from your view!`)
-      
     } catch (error) {
-      alert(`Error deleting list: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error deleting list:', error)
     }
   }
 
   const shareList = (listId, listName) => {
     // Share the listId so others can join
     navigator.clipboard.writeText(listId)
-    alert(`List ID for "${listName}" copied to clipboard!\n\nShare this ID: ${listId}`)
+    console.log(`List ID copied: ${listId}`)
+  }
+
+  const syncWithServer = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch(`${API_URL}/sync`, {
+        method: 'POST'
+      })
+      
+      if (response.ok) {
+        // Reload lists to show updated data with globalIds
+        await loadAllLists()
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Sync failed')
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const addItem = async () => {
     if (!newItem.trim() || !currentList) return
 
-    setLoading(true)
     try {
+      const quantity = parseInt(newQuantity) || 1
+      
+      // Update local state optimistically
+      setCurrentList(prev => ({
+        ...prev,
+        items: [...prev.items, { item: newItem, inc: quantity, dec: 0 }]
+      }))
+      setNewItem('')
+      setNewQuantity(1)
+
       const response = await fetch(`${API_URL}/lists/${currentList.listId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemName: newItem, quantity: parseInt(newQuantity) || 1 })
+        body: JSON.stringify({ itemName: newItem, quantity })
       })
       
-      if (response.ok) {
-        await loadList(currentList.listId)
-        setNewItem('')
-        setNewQuantity(1)
-      } else {
+      if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to add item')
       }
-      
     } catch (error) {
-      alert(`Error adding item: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error adding item:', error)
     }
   }
 
   const increaseNeeded = async (itemName) => {
-    setLoading(true)
     try {
+      // Update local state optimistically
+      setCurrentList(prev => ({
+        ...prev,
+        items: prev.items.map(item => 
+          item.item === itemName
+            ? { ...item, inc: item.inc + 1 }
+            : item
+        )
+      }))
+
       const response = await fetch(`${API_URL}/lists/${currentList.listId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemName, quantity: 1 })
       })
       
-      if (response.ok) {
-        await loadList(currentList.listId)
-      } else {
+      if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to increase quantity')
       }
-      
     } catch (error) {
-      alert(`Error: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error increasing quantity:', error)
     }
   }
 
   const increaseBought = async (itemName) => {
-    setLoading(true)
     try {
+      // Update local state optimistically
+      setCurrentList(prev => ({
+        ...prev,
+        items: prev.items.map(item => 
+          item.item === itemName
+            ? { ...item, dec: item.dec + 1 }
+            : item
+        )
+      }))
+
       const response = await fetch(`${API_URL}/lists/${currentList.listId}/bought`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemName })
       })
       
-      if (response.ok) {
-        await loadList(currentList.listId)
-      } else {
+      if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to mark as bought')
       }
-      
     } catch (error) {
-      alert(`Error: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error marking as bought:', error)
     }
   }
 
   const removeItem = async (itemName) => {
-    setLoading(true)
     try {
+      // Update local state optimistically
+      setCurrentList(prev => ({
+        ...prev,
+        items: prev.items.filter(item => item.item !== itemName)
+      }))
+
       const response = await fetch(`${API_URL}/lists/${currentList.listId}/items/${itemName}`, {
         method: 'DELETE'
       })
       
-      if (response.ok) {
-        await loadList(currentList.listId)
-      } else {
+      if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to remove item')
       }
-      
     } catch (error) {
-      alert(`Error removing item: ${error.message}`)
-    } finally {
-      setLoading(false)
+      console.error('Error removing item:', error)
     }
   }
 
@@ -265,10 +277,10 @@ function App() {
               />
               <button 
                 onClick={createList}
-                disabled={loading || !newListName.trim()}
+                disabled={!newListName.trim()}
                 className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creating...' : 'Create List'}
+                Create List
               </button>
             </div>
           </div>
@@ -287,10 +299,10 @@ function App() {
               />
               <button 
                 onClick={joinList}
-                disabled={loading || !joinListId.trim()}
+                disabled={!joinListId.trim()}
                 className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Joining...' : 'Join List'}
+                Join List
               </button>
             </div>
           </div>
@@ -299,7 +311,17 @@ function App() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-semibold">My Lists</h2>
-              <span className="text-gray-600">{lists.length} lists</span>
+              <div className="flex items-center gap-3">
+                <span className="text-gray-600">{lists.length} lists</span>
+                <button
+                  onClick={syncWithServer}
+                  disabled={syncing}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2"
+                >
+                  <span className={syncing ? 'animate-spin' : ''}>🔄</span>
+                  <span>{syncing ? 'Syncing...' : 'Sync'}</span>
+                </button>
+              </div>
             </div>
 
             {lists.length > 0 ? (
@@ -314,14 +336,14 @@ function App() {
                           className="text-blue-500 hover:text-blue-700 p-1"
                           title="Share list"
                         >
-                          📤
+                          Share
                         </button>
                         <button
                           onClick={() => deleteList(list.listId, list.name)}
                           className="text-red-500 hover:text-red-700 p-1"
                           title="Delete list"
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -370,13 +392,13 @@ function App() {
                 onClick={() => shareList(currentList.listId, currentList.name)}
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center gap-2"
               >
-                📤 Share
+                Share
               </button>
               <button
                 onClick={() => deleteList(currentList.listId, currentList.name)}
                 className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex items-center gap-2"
               >
-                🗑️ Delete
+                Delete
               </button>
             </div>
           </div>
@@ -403,10 +425,10 @@ function App() {
               />
               <button 
                 onClick={addItem}
-                disabled={loading || !newItem.trim()}
+                disabled={!newItem.trim()}
                 className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Adding...' : 'Add Item'}
+                Add Item
               </button>
             </div>
           </div>
@@ -470,15 +492,6 @@ function App() {
         </div>
       )}
 
-      {/* Loading Overlay */}
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <div>Loading...</div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
