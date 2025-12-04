@@ -64,4 +64,14 @@ export default class AWORSet {
         return res;
     }
 
+    toJson() {
+        return { id: this.id, dk: this.dk.toJson() };
+    }
+
+    static fromJson(json) {
+        const set = new AWORSet(json.id);
+        set.dk = DotKernel.fromJson(json.dk);
+        return set;
+    }
+
 }

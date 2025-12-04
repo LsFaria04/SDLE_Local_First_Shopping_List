@@ -121,7 +121,19 @@ export default class DotContext {
         this.compact();
     }
 
+    toJson() {
+        return {
+            cc: Object.fromEntries(this.cc),
+            dc: Array.from(this.dc)
+        };
+    }
 
+    static fromJson(json) {
+        const ctx = new DotContext();
+        ctx.cc = new Map(Object.entries(json.cc).map(([k, v]) => [k, Number(v)]));
+        ctx.dc = new Set(json.dc);
+        return ctx;
+    }
 
 
 }

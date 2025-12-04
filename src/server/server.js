@@ -62,7 +62,7 @@ async function runWorker(identity, port) {
           ws.send(
             JSON.stringify({
               code: 200,
-              list: syncList,
+              list: syncList.toJson(),
             })
           );
 
@@ -119,27 +119,17 @@ runWorker(process.env.SERVER_ID, process.env.PORT);
 /**
  * Syncs the server list with the list sent by the client
  */
-function syncLists(list) {
-  let serverList = shoppingLists.get(list.listId.toString());
-
-  const newShoppingList = new ShoppingList(
-    process.env.SERVER_ID,
-    list.listId,
-    list.name
-  );
-  for (const product of list.items) {
-    newShoppingList.addItem(product.item, product.inc);
-    newShoppingList.markBought(product.item, product.dec);
-  }
-
-  if (serverList) {
-    serverList.merge(newShoppingList);
-    shoppingLists.set(list.listId, serverList);
-  } else {
-    shoppingLists.set(list.listId, newShoppingList);
-    serverList = newShoppingList;
-  }
-  return serverList;
+function syncLists(incomingJson) {
+    const incoming = ShoppingList.fromJson(incomingJson);
+    
+    if (shoppingLists.has(incoming.listId)) {
+        const existing = shoppingLists.get(incoming.listId);
+        existing.merge(incoming);
+        return existing;
+    } else {
+        shoppingLists.set(incoming.listId, incoming);
+        return incoming;
+    }
 }
 
 /**
