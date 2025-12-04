@@ -85,7 +85,7 @@ async function runWorker(identity, port) {
           ws.send(
             JSON.stringify({
               code: 200,
-              list: list,
+              list: list.toJson(),
             })
           );
         } else {
