@@ -160,7 +160,7 @@ function App() {
       // Update local state optimistically
       setCurrentList(prev => ({
         ...prev,
-        items: [...prev.items, { item: newItem, inc: quantity, dec: 0 }]
+        itemsDisplay: [...prev.itemsDisplay || [], { item: newItem, inc: quantity, dec: 0 }]
       }))
       setNewItem('')
       setNewQuantity(1)
