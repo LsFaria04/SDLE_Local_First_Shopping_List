@@ -111,6 +111,14 @@ function App() {
         setCurrentList(null)
         setView('all-lists')
       }
+      const response = await fetch (`${API_URL}/lists/${listId}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete list')
+      }
+
     } catch (error) {
       console.error('Error deleting list:', error)
     }
@@ -177,7 +185,7 @@ function App() {
       // Update local state optimistically
       setCurrentList(prev => ({
         ...prev,
-        items: prev.items.map(item => 
+        itemsDisplay: prev.itemsDisplay.map(item => 
           item.item === itemName
             ? { ...item, inc: item.inc + 1 }
             : item
@@ -204,7 +212,7 @@ function App() {
       // Update local state optimistically
       setCurrentList(prev => ({
         ...prev,
-        items: prev.items.map(item => 
+        itemsDisplay: prev.itemsDisplay.map(item => 
           item.item === itemName
             ? { ...item, dec: item.dec + 1 }
             : item
@@ -231,7 +239,7 @@ function App() {
       // Update local state optimistically
       setCurrentList(prev => ({
         ...prev,
-        items: prev.items.filter(item => item.item !== itemName)
+        itemsDisplay: prev.itemsDisplay.filter(item => item.item !== itemName)
       }))
 
       const response = await fetch(`${API_URL}/lists/${currentList.listId}/items/${itemName}`, {
@@ -350,7 +358,7 @@ function App() {
                     
                     <div className="text-sm text-gray-600 mb-3">
                       <div>ID: <code className="bg-gray-100 px-1 rounded">{list.listId}</code></div>
-                      <div>{list.items?.length || 0} items</div>
+                      <div>{list.itemsDisplay?.length || 0} items</div>
                     </div>
                     
                     <button
@@ -436,12 +444,12 @@ function App() {
           {/* Items List */}
           <div>
             <h3 className="text-xl font-semibold mb-4">
-              Items ({currentList.items?.length || 0})
+              Items ({currentList.itemsDisplay?.length || 0})
             </h3>
             
-            {currentList.items && currentList.items.length > 0 ? (
+            {currentList.itemsDisplay && currentList.itemsDisplay.length > 0 ? (
               <div className="space-y-3">
-                {currentList.items.map((item, index) => (
+                {currentList.itemsDisplay.map((item, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <div className="flex-1">
                       <div className="font-semibold text-lg text-gray-800 mb-1">{item.item}</div>

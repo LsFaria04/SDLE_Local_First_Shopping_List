@@ -40,12 +40,15 @@ function deleteListInDB(listId) {
       else console.log(`List ${listId} soft deleted`);
     }
   );
+  console.log(`Requested deletion of list ${listId}`);
 }
 
 // Handle messages from parent
 parentPort.on('message', (message) => {
   switch (message.type) {
     case 'create':
+      createList(db, message.list);
+      break;
     case 'update':
       updateListInDB(message.list);
       break;

@@ -11,7 +11,7 @@ const { Database } = pkg;
 export function loadLists(db){
     return new Promise((resolve, reject) => {
         // Load the lists from the database
-        db.all("SELECT * FROM list;", async (err, rows) => {
+        db.all("SELECT * FROM list WHERE soft_delete = 0;", async (err, rows) => {
         if (err) {
             return reject(err);
         }
@@ -139,58 +139,68 @@ export function createList(db, list){
  */
 export function updateList(db, list){
     return new Promise((resolve, reject) => {
-       db.run(
-        "UPDATE list SET name = ? WHERE globalId = ?",
-        [list.name, list.listId],
-        (err) => {
-            if (err) return reject(err);
+        db.run(
+            "UPDATE list SET name = ? WHERE globalId = ?",
+            [list.name, list.listId],
+            (err) => {
+                if (err) return reject(err);
 
-            db.get(
-            "SELECT id FROM list WHERE globalId = ?",
-            [list.listId],
-            (getErr, row) => {
-                if (getErr) return reject(getErr);
-                if (!row) return reject(new Error("List not found"));
+                db.get(
+                "SELECT id FROM list WHERE globalId = ?",
+                [list.listId],
+                (getErr, row) => {
+                    if (getErr) return reject(getErr);
+                    if (!row) return reject(new Error("List not found"));
 
-                const actualListId = row.id;
+                    const actualListId = row.id;
 
-                // Use itemsDisplay for database storage (array format)
-                const displayItems = list.itemsDisplay || [];
-                
-                if (displayItems.length === 0) {
-                return resolve();
-                }
-
-                let remaining = displayItems.length;
-                let failed = false;
-
-                for (const item of displayItems) {
-                db.run(
-                    `INSERT INTO product (name, quantity, bought, list_id)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(name, list_id) DO UPDATE SET
-                    quantity = excluded.quantity,
-                    bought   = excluded.bought`,
-                    [item.item, item.inc, item.dec, actualListId],
-                    (itemErr) => {
-                    if (failed) return;
-                    if (itemErr) {
-                        failed = true;
-                        return reject(itemErr);
+                    // Use itemsDisplay for database storage (array format)
+                    const displayItems = list.itemsDisplay || [];
+                    
+                    if (displayItems.length === 0) {
+                    return resolve();
                     }
 
-                    remaining -= 1;
-                    if (remaining === 0) {
-                        resolve();
-                    }
-                    }
-                );
-                }
+                    let remaining = displayItems.length;
+                    let failed = false;
+                    
+                    // Delete items that are not in displayItems
+                    const itemNames = displayItems.map(item => item.item);
+                    const placeholders = itemNames.map(() => '?').join(', ');
+                    db.run(
+                    `DELETE FROM product WHERE list_id = ? AND name NOT IN (${placeholders})`,
+                    [actualListId, ...itemNames],
+                    (delErr) => {
+                        if (delErr) {
+                        return reject(delErr);
+                        }
+
+                        // Now upsert the provided items
+                        for (const item of displayItems) {
+                            db.run(
+                                `INSERT INTO product (name, quantity, bought, list_id)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(name, list_id) DO UPDATE SET
+                                quantity = excluded.quantity,
+                                bought   = excluded.bought`,
+                                [item.item, item.inc, item.dec, actualListId],
+                                (itemErr) => {
+                                    if (failed) return;
+                                    if (itemErr) {
+                                        failed = true;
+                                        return reject(itemErr);
+                                    }
+
+                                    remaining -= 1;
+                                    if (remaining === 0) {
+                                        resolve();
+                                    }
+                                }
+                            );
+                        }
+                    });
+                });
             }
-            );
-        }
         );
     });
 }
-
-
