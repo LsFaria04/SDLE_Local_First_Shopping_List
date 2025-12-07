@@ -33,16 +33,17 @@ async function runWorker(identity, port) {
 
   // initialize the replication worker
   const neighbor_worker = new Worker("./server/replication_worker.js", {
-    port: process.env.PORT,
-    numberOfNeighbors: 2
+    workerData: {
+      port: process.env.PORT,
+      numberOfNeighbors: 2
+    }
   });
 
   //initialize the reception of messages from the neighbors
   neighbor_worker.on("message", (message) => {
     if(message.type === "update"){
       try{
-        const syncList = syncLists(message.list);
-        neighbor_worker.postMessage({type: "updateNeighbors", list : syncList.toJson()});
+        syncLists(message.list);
       } catch(err){
         console.log(`Could not receive the update from a neighbor: ${err}`);
       }

@@ -1,5 +1,5 @@
-import { error } from 'console';
 import {parentPort, workerData} from 'worker_threads';
+import {WebSocket,  WebSocketServer} from "ws";
 
 const port = workerData.port; //current base port is 6000
 const numberOfNeighbors = workerData.numberOfNeighbors;
@@ -59,9 +59,13 @@ function updateNeighborServer(port, list, timeoutMs = 3000) {
  * @param {*} list List to send
  */
 function updateNeighborServers(currentPort, numberOfNeighbors, list) {
-    for (let i = 0; i < numberOfNeighbors; i++) {
+    for (let i = 1; i <= numberOfNeighbors; i++) {
         const updatePort = currentPort + 1000; // update port of current server
-        const neighborPort = basePort + ((updatePort - basePort + i) % numberOfNeighbors);
+        const neighborPort = basePort + ((updatePort - basePort + i) % (numberOfNeighbors + 1));
+
+        if(neighborPort == currentPort){
+            neighborPort += 1; //avoid loop requests
+        }
 
         updateNeighborServer(neighborPort, list);
     }
@@ -72,25 +76,34 @@ function updateNeighborServers(currentPort, numberOfNeighbors, list) {
  * @param {number} port Port used to listen
  */
 function listenForNeighborUpdates(port) {
-    const updateSocket = new WebSocket(`ws://127.0.0.1:${port + 1000}`);
+    const serverPort = port + 1000;
+    const wss = new WebSocketServer({ port: serverPort });
 
-    updateSocket.on("message", (message) => {
-        try {
-            const data = JSON.parse(message);
-            if (data.type === "update") {
-                const list = data.list;
-                parentPort.postMessage({ type: "update", list });
+    wss.on("connection", (socket) => {
+        console.log(`Neighbor connected on port ${serverPort}`);
 
-                // Send ack back to sender
-                updateSocket.send(JSON.stringify({ type: "ack" }));
+        socket.on("message", (message) => {
+            try {
+                const data = JSON.parse(message);
+                if (data.type === "update") {
+                    const list = data.list;
+                    parentPort.postMessage({ type: "update", list });
+
+                    // Send ack back to sender
+                    socket.send(JSON.stringify({ type: "ack" }));
+                }
+            } catch (err) {
+                console.error("Invalid update message:", message);
             }
-        } catch (err) {
-            console.error("Invalid update message:", message);
-        }
-    });
+        });
 
-    updateSocket.on("error", (err) => {
-        console.error("Update socket error:", err);
+        socket.on("error", (err) => {
+            console.error("Update socket error:", err);
+        });
+
+        socket.on("close", () => {
+            console.log("Neighbor disconnected");
+        });
     });
 }
 
@@ -102,4 +115,4 @@ parentPort.on('message', (message) => {
     }
 });
 
-listenForNeighborUpdates();
+listenForNeighborUpdates(Number(port));
