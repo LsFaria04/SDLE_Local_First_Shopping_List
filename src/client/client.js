@@ -100,8 +100,9 @@ function runClient(identity) {
   const list = new ShoppingList(1, 2, "teste");
   list.addItem("teste", 1);
   list.addItem("product1", 1);
-  list.addItem("product2", 1);
+  list.addItem("product2", 10);
   list.markBought("product1", 1);
+  list.removeItem("teste");
 
   // Connect to proxy via WebSocket
   const socket = new WebSocket("ws://127.0.0.1:5555");
@@ -114,7 +115,7 @@ function runClient(identity) {
     socket.send(JSON.stringify(message));
 
     // Message type: "get" to receive a list with a global id shared by another user
-    const message2 = { type: "get", listId: "1" };
+    const message2 = { type: "get", listId: "2" };
     socket.send(JSON.stringify(message2));
   });
 
@@ -134,8 +135,8 @@ function runClient(identity) {
   socket.on("error", (err) => {
     console.error(`${identity} connection error:`, err);
   });
-}
-*/
+}*/
+
 
 // Get all lists
 app.get("/lists", (req, res) => {

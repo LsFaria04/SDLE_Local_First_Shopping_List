@@ -10,6 +10,7 @@ function updateListInDB(list){
     const stmt = db.prepare("SELECT * FROM list WHERE globalId = ?;");
     stmt.all(list.listId, (err, rows) => {
             stmt.finalize(); // free resources
+            
 
             if (err) {
                 //no special action

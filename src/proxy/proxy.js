@@ -27,40 +27,61 @@ if (cluster.isPrimary) {
         const requestId = message.requestId;
 
         // Decide the node using consistent hashing
-        let node = 0;
+        let preferenceList = [];
         if (message.type === "sync") {
           if (message.list.listId === null) {
             // no global id so a new one is created
             message.list.listId = randomUUID();
           }
-          node = hashing.getNode(message.list.listId.toString());
+          preferenceList = hashing.getPreferenceList(message.list.listId.toString(), 3);
         } else if (message.type === "get") {
-          node = hashing.getNode(message.listId.toString());
+          preferenceList = hashing.getPreferenceList(message.listId.toString(), 3);
         } else {
           clientSocket.send(JSON.stringify({ code: 400, error: "Unknown message type" }));
           return;
         }
 
+        if (preferenceList.length <= 0) {
+          clientSocket.send(JSON.stringify({ code: 500, error: "No server available" }));
+          return;
+        }
 
-        // Connect to backend server via WebSocket
-        const backendSocket = new WebSocket(`ws://127.0.0.1:${6000 + node}`);
+        // try connecting to backend servers in preference order
+        function forwardToBackend(index = 0) {
+          if (index >= preferenceList.length) {
+            clientSocket.send(JSON.stringify({ code: 500, error: "All servers unavailable" }));
+            return;
+          }
 
-        backendSocket.on("open", () => {
-          const { requestId: reqId, ...backendMessage } = message;
-          backendSocket.send(JSON.stringify(backendMessage));
-        });
+          const node = preferenceList[index];
+          const backendSocket = new WebSocket(`ws://127.0.0.1:${6000 + node}`);
 
-        backendSocket.on("message", (reply) => {
-          const response = JSON.parse(reply.toString());
-          response.requestId = requestId;
-          clientSocket.send(JSON.stringify(response));
-          backendSocket.close();
-        });
+          backendSocket.on("open", () => {
+            const { requestId: reqId, ...backendMessage } = message;
+            backendSocket.send(JSON.stringify(backendMessage));
+          });
 
-        backendSocket.on("error", (err) => {
-          console.error("Backend connection error:", err);
-          clientSocket.send(JSON.stringify({ code: 500, error: "Error contacting server" }));
-        });
+          backendSocket.on("message", (reply) => {
+            const response = JSON.parse(reply.toString());
+            response.requestId = requestId;
+            clientSocket.send(JSON.stringify(response));
+            backendSocket.close();
+          });
+
+          backendSocket.on("error", (err) => {
+            console.error(`Backend connection error at node ${node}:`, err.message);
+            backendSocket.close();
+            // Try next replica
+            forwardToBackend(index + 1);
+          });
+
+          backendSocket.on("close", () => {
+            console.log(`Backend ${node} disconnected`);
+          });
+        }
+
+        // Start with the primary node
+        forwardToBackend(0);
       });
 
       clientSocket.on("close", () => {
@@ -97,7 +118,7 @@ if (cluster.isPrimary) {
   }
 
   // Fork workers (servers in the ring)
-  const servers = ["0", "1", "2"];
+  const servers = ["0", "1", "2", "3", "4"];
   servers.forEach((id, idx) => {
     cluster.fork({ SERVER_ID: id, PORT: 6000 + idx });
   });
