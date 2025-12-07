@@ -31,7 +31,23 @@ async function runWorker(identity, port) {
     workerData: { dbPath: `./database/server${identity}.db` },
   });
 
-  // TODO: initialize the replication worker
+  // initialize the replication worker
+  const neighbor_worker = new Worker("./server/replication_worker.js", {
+    port: process.env.PORT,
+    numberOfNeighbors: 2
+  });
+
+  //initialize the reception of messages from the neighbors
+  neighbor_worker.on("message", (message) => {
+    if(message.type === "update"){
+      try{
+        const syncList = syncLists(message.list);
+        neighbor_worker.postMessage({type: "updateNeighbors", list : syncList.toJson()});
+      } catch(err){
+        console.log(`Could not receive the update from a neighbor: ${err}`);
+      }
+    }
+  });
 
   // WebSocket server
   const wss = new WebSocketServer({ port });
@@ -68,6 +84,8 @@ async function runWorker(identity, port) {
 
           //update the list in the database
           db_worker.postMessage({type: "update", list: syncList.toJson()});
+          //update the list in the neighbors
+          neighbor_worker.postMessage({type: "updateNeighbors", list : syncList.toJson()});
 
         } else if (type === "get") {
           const list = getList(msg.listId);

@@ -94,7 +94,7 @@ async function loadListsFromDatabase() {
   }
 }
 
-/*
+
 function runClient(identity) {
   // Just a test shopping list
   const list = new ShoppingList(1, 2, "teste");
@@ -102,6 +102,7 @@ function runClient(identity) {
   list.addItem("product1", 1);
   list.addItem("product2", 1);
   list.markBought("product1", 1);
+  list.removeItem("teste");
 
   // Connect to proxy via WebSocket
   const socket = new WebSocket("ws://127.0.0.1:5555");
@@ -135,7 +136,7 @@ function runClient(identity) {
     console.error(`${identity} connection error:`, err);
   });
 }
-*/
+
 
 // Get all lists
 app.get("/lists", (req, res) => {
@@ -418,4 +419,4 @@ initializeDatabase()
   });
 
 // Then try to connect to proxy
-//runClient("client-1");
+runClient("client-1");
