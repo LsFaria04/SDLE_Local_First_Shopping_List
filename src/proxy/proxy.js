@@ -118,7 +118,7 @@ if (cluster.isPrimary) {
   }
 
   // Fork workers (servers in the ring)
-  const servers = ["0", "1", "2"];
+  const servers = ["0", "1", "2", "3", "4"];
   servers.forEach((id, idx) => {
     cluster.fork({ SERVER_ID: id, PORT: 6000 + idx });
   });

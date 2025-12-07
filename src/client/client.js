@@ -94,7 +94,7 @@ async function loadListsFromDatabase() {
   }
 }
 
-
+/*
 function runClient(identity) {
   // Just a test shopping list
   const list = new ShoppingList(1, 2, "teste");
@@ -122,7 +122,7 @@ function runClient(identity) {
   socket.on("message", (data) => {
     try {
       const reply = JSON.parse(data.toString());
-      console.log(`${identity} received reply:`, reply.list);
+      console.log(`${identity} received reply:`, reply);
     } catch (err) {
       console.error("Error parsing reply:", err);
     }
@@ -135,7 +135,7 @@ function runClient(identity) {
   socket.on("error", (err) => {
     console.error(`${identity} connection error:`, err);
   });
-}
+}*/
 
 
 // Get all lists
@@ -419,4 +419,4 @@ initializeDatabase()
   });
 
 // Then try to connect to proxy
-runClient("client-1");
+//runClient("client-1");

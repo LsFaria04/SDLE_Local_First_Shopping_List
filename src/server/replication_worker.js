@@ -1,9 +1,11 @@
 import {parentPort, workerData} from 'worker_threads';
 import {WebSocket,  WebSocketServer} from "ws";
+import ConsistentHashRing from "../dynamo-core/consistent_hash.js";
 
-const port = workerData.port; //current base port is 6000
+const serverID = workerData.id; //current base port is 6000
 const numberOfNeighbors = workerData.numberOfNeighbors;
 const basePort = 7000;
+const hashing = new ConsistentHashRing([0, 1, 2]); //used to get the neighbors
 
 /**
  * Updates a neighbor server list with the new list information from the current server
@@ -58,14 +60,16 @@ function updateNeighborServer(port, list, timeoutMs = 3000) {
  * @param {number} numberOfNeighbors Number of neighbors of the current server
  * @param {*} list List to send
  */
-function updateNeighborServers(currentPort, numberOfNeighbors, list) {
+function updateNeighborServers(serverID, numberOfNeighbors, list) {
+    const preferenceList = hashing.getPreferenceList(list.listId.toString(), numberOfNeighbors + 1);
     for (let i = 1; i <= numberOfNeighbors; i++) {
-        const updatePort = currentPort + 1000; // update port of current server
-        const neighborPort = basePort + ((updatePort - basePort + i) % (numberOfNeighbors + 1));
+        const neighbor = preferenceList[i];
 
-        if(neighborPort == currentPort){
-            neighborPort += 1; //avoid loop requests
+        if(neighbor == serverID){
+           continue;
         }
+
+        const neighborPort = 7000 + neighbor
 
         updateNeighborServer(neighborPort, list);
     }
@@ -73,10 +77,10 @@ function updateNeighborServers(currentPort, numberOfNeighbors, list) {
 
 /**
  * Listens on the update port for updates from the neighbors
- * @param {number} port Port used to listen
+ * @param {number} server_id Server id used to know the port to use
  */
-function listenForNeighborUpdates(port) {
-    const serverPort = port + 1000;
+function listenForNeighborUpdates(server_id) {
+    const serverPort = 7000 + Number(server_id);
     const wss = new WebSocketServer({ port: serverPort });
 
     wss.on("connection", (socket) => {
@@ -111,8 +115,8 @@ function listenForNeighborUpdates(port) {
 
 parentPort.on('message', (message) => {
     if (message.type === 'updateNeighbors') {
-      updateNeighborServers(port, Number(numberOfNeighbors), message.list);
+      updateNeighborServers(serverID, Number(numberOfNeighbors), message.list);
     }
 });
 
-listenForNeighborUpdates(Number(port));
+listenForNeighborUpdates(serverID);

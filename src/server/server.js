@@ -36,7 +36,7 @@ async function runWorker(identity, port) {
   // initialize the replication worker
   const neighbor_worker = new Worker("./server/replication_worker.js", {
     workerData: {
-      port: process.env.PORT,
+      id: process.env.SERVER_ID,
       numberOfNeighbors: 2
     }
   });
@@ -94,7 +94,7 @@ async function runWorker(identity, port) {
         } else if (type === "get") {
           const list = await getList(msg.listId);
 
-          if (!list) {
+          if (list == null) {
             ws.send(
               JSON.stringify({
                 code: 404,
@@ -203,6 +203,7 @@ async function initShoppingLists(db) {
   let shoppingLists = new Map();
 
   for (const { list, products } of lists_products) {
+    console.log(products)
     const shoppingList = new ShoppingList(
       process.env.SERVER_ID,
       list.globalId,
