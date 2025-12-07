@@ -100,7 +100,7 @@ function runClient(identity) {
   const list = new ShoppingList(1, 2, "teste");
   list.addItem("teste", 1);
   list.addItem("product1", 1);
-  list.addItem("product2", 1);
+  list.addItem("product2", 10);
   list.markBought("product1", 1);
   list.removeItem("teste");
 
@@ -115,14 +115,14 @@ function runClient(identity) {
     socket.send(JSON.stringify(message));
 
     // Message type: "get" to receive a list with a global id shared by another user
-    const message2 = { type: "get", listId: "1" };
+    const message2 = { type: "get", listId: "2" };
     socket.send(JSON.stringify(message2));
   });
 
   socket.on("message", (data) => {
     try {
       const reply = JSON.parse(data.toString());
-      console.log(`${identity} received reply:`, reply);
+      console.log(`${identity} received reply:`, reply.list);
     } catch (err) {
       console.error("Error parsing reply:", err);
     }

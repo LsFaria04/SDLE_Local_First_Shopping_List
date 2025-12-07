@@ -3,11 +3,13 @@ import pkg from "sqlite3"; // sqlite3 is CommonJS
 import { loadLists } from "./database_operations.js";
 import ShoppingList from "../models/ShoppingList.js";
 import { Worker } from "worker_threads";
-import WebSocket, { WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
+import {Mutex} from "async-mutex";
 
 const { Database } = pkg;
 
 let shoppingLists = new Map(); // where all the lists in the server are stored
+const lock = new Mutex();
 
 /**
  * Main server function. Handles requests from proxy via WebSocket.
@@ -40,10 +42,11 @@ async function runWorker(identity, port) {
   });
 
   //initialize the reception of messages from the neighbors
-  neighbor_worker.on("message", (message) => {
+  neighbor_worker.on("message", async (message) => {
     if(message.type === "update"){
       try{
-        syncLists(message.list);
+        const syncList = await syncLists(message.list);
+        db_worker.postMessage({type: "update", list: syncList.toJson()});
       } catch(err){
         console.log(`Could not receive the update from a neighbor: ${err}`);
       }
@@ -56,7 +59,7 @@ async function runWorker(identity, port) {
   wss.on("connection", (ws) => {
     console.log(`Worker ${identity} connected to proxy`);
 
-    ws.on("message", (data) => {
+    ws.on("message", async (data) => {
       try {
         const msg = JSON.parse(data.toString());
         console.log(`Worker ${identity} received list ${msg.list?.listId}`);
@@ -75,7 +78,7 @@ async function runWorker(identity, port) {
             return;
           }
 
-          const syncList = syncLists(list);
+          const syncList = await syncLists(list);
           ws.send(
             JSON.stringify({
               code: 200,
@@ -89,7 +92,7 @@ async function runWorker(identity, port) {
           neighbor_worker.postMessage({type: "updateNeighbors", list : syncList.toJson()});
 
         } else if (type === "get") {
-          const list = getList(msg.listId);
+          const list = await getList(msg.listId);
 
           if (!list) {
             ws.send(
@@ -138,24 +141,34 @@ runWorker(process.env.SERVER_ID, process.env.PORT);
 /**
  * Syncs the server list with the list sent by the client
  */
-function syncLists(incomingJson) {
+async function syncLists(incomingJson) {
     const incoming = ShoppingList.fromJson(incomingJson);
-    
-    if (shoppingLists.has(incoming.listId)) {
+    let returningList = incoming;
+    await lock.runExclusive(async () => {
+       if (shoppingLists.has(incoming.listId)) {
         const existing = shoppingLists.get(incoming.listId);
         existing.merge(incoming);
-        return existing;
-    } else {
-        shoppingLists.set(incoming.listId, incoming);
-        return incoming;
-    }
+        returningList = existing;
+      } else {
+          shoppingLists.set(incoming.listId, incoming);
+          returningList = incoming;
+          
+      }
+    });
+
+    return returningList;
+   
 }
 
 /**
  * Gets a list from the server or returns undefined if not found
  */
-function getList(listId) {
-  return shoppingLists.get(listId);
+async function getList(listId) {
+  let returningList = null;
+  await lock.runExclusive(async () => {
+    returningList = shoppingLists.get(listId);
+  });
+  return returningList;
 }
 
 /**
@@ -190,7 +203,6 @@ async function initShoppingLists(db) {
   let shoppingLists = new Map();
 
   for (const { list, products } of lists_products) {
-    console.log(products)
     const shoppingList = new ShoppingList(
       process.env.SERVER_ID,
       list.globalId,
