@@ -10,8 +10,15 @@ function App() {
   const [joinListId, setJoinListId] = useState('')
   const [view, setView] = useState('all-lists')
   const [syncing, setSyncing] = useState(false)
+  const [toast, setToast] = useState(null)
 
   const API_URL = 'http://localhost:3000'
+
+  // Show toast notification
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   // Load lists on mount
   useEffect(() => {
@@ -122,9 +129,15 @@ function App() {
     }
   }
 
+  const isListSynced = (listId) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(listId)
+  }
+
   const shareList = (listId, listName) => {
     // Copy the listId to clipboard for sharing
     navigator.clipboard.writeText(listId)
+    showToast(`List ID copied to clipboard!`, 'success')
     console.log(`List ID copied: ${listId}`)
   }
 
@@ -269,6 +282,17 @@ function App() {
 
   return (
     <div className="container mx-auto p-4 max-w-6xl">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+          toast.type === 'success' ? 'bg-green-500' : 
+          toast.type === 'error' ? 'bg-red-500' : 
+          'bg-blue-500'
+        } text-white font-medium animate-fade-in`}>
+          {toast.message}
+        </div>
+      )}
+
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold text-blue-600 mb-2">🛒 Listify</h1>
         <p className="text-gray-600">Collaborative shopping lists made easy</p>
@@ -347,8 +371,9 @@ function App() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => shareList(list.listId, list.name)}
-                          className="text-blue-500 hover:text-blue-700 p-1"
-                          title="Share list"
+                          disabled={!isListSynced(list.listId)}
+                          className="text-blue-500 hover:text-blue-700 p-1 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          title={isListSynced(list.listId) ? "Share list" : "Sync list first to share"}
                         >
                           Share
                         </button>
@@ -363,7 +388,11 @@ function App() {
                     </div>
                     
                     <div className="text-sm text-gray-600 mb-3">
-                      <div>ID: <code className="bg-gray-100 px-1 rounded">{list.listId}</code></div>
+                      <div>ID: <code className="bg-gray-100 px-1 rounded">
+                        {/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(list.listId) 
+                          ? list.listId 
+                          : <span className="text-orange-600 font-semibold">Not synced</span>}
+                      </code></div>
                       <div>{list.itemsDisplay?.length || 0} items</div>
                     </div>
                     
@@ -399,12 +428,18 @@ function App() {
                 ← Back to All Lists
               </button>
               <h2 className="text-3xl font-bold text-gray-800">{currentList.name}</h2>
-              <p className="text-gray-600">List ID: <code className="bg-gray-100 px-2 py-1 rounded">{currentList.listId}</code></p>
+              <p className="text-gray-600">List ID: <code className="bg-gray-100 px-2 py-1 rounded">
+                {/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentList.listId) 
+                  ? currentList.listId 
+                  : <span className="text-orange-600 font-semibold">Not synced - sync to share</span>}
+              </code></p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => shareList(currentList.listId, currentList.name)}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center gap-2"
+                disabled={!isListSynced(currentList.listId)}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                title={isListSynced(currentList.listId) ? "Share list" : "Sync list first to share"}
               >
                 Share
               </button>
