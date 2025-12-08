@@ -130,6 +130,8 @@ function App() {
 
   const syncWithServer = async () => {
     setSyncing(true)
+    const startTime = Date.now()
+    
     try {
       const response = await fetch(`${API_URL}/sync`, {
         method: 'POST'
@@ -145,6 +147,12 @@ function App() {
     } catch (error) {
       console.error('Sync error:', error)
     } finally {
+      // Ensure loading state shows for at least 500ms to avoid flash
+      const elapsed = Date.now() - startTime
+      const minDelay = 500
+      if (elapsed < minDelay) {
+        await new Promise(resolve => setTimeout(resolve, minDelay - elapsed))
+      }
       setSyncing(false)
     }
   }
@@ -321,8 +329,8 @@ function App() {
                 <span className="text-gray-600">{lists.length} lists</span>
                 <button
                   onClick={syncWithServer}
-                  disabled={syncing}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2"
+                  disabled={syncing || lists.length === 0}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <span className={syncing ? 'animate-spin' : ''}>🔄</span>
                   <span>{syncing ? 'Syncing...' : 'Sync'}</span>

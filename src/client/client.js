@@ -271,6 +271,17 @@ app.post("/toggle-online", (req, res) => {
 // Sync with server
 app.post("/sync", async (req, res) => {
   try {
+    if (localLists.size === 0) {
+      console.log("No lists to sync");
+      return res.json({ 
+        online: isOnline, 
+        syncResults: [],
+        message: "No lists to sync"
+      });
+    }
+
+    console.log(`Syncing ${localLists.size} list(s)...`);
+    
     const socket = new WebSocket("ws://127.0.0.1:5555");
     let syncResults = [];
     let pendingReplies = 0;
@@ -281,7 +292,7 @@ app.post("/sync", async (req, res) => {
       console.log("Connected to proxy for sync");
       isOnline = true;
 
-      // Send each list with a unique requestId to track the response
+      // sync all lists
       localLists.forEach((list, localListId) => {
         const requestId = `sync-${requestCounter++}`;
         requestTracker.set(requestId, localListId);
