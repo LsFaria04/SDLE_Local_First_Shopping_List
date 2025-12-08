@@ -495,22 +495,12 @@ function App() {
                     <div className="flex-1">
                       <div className="font-semibold text-lg text-gray-800 mb-1">{item.item}</div>
                       <div className="text-sm text-gray-600">
-                        <span className="font-medium">Need: {Math.max(0, item.inc - item.dec)}</span> • 
-                        <span className="font-medium text-green-600"> Bought: {item.dec}</span> • 
-                        <span className="font-medium text-blue-600"> Total: {item.inc}</span>
+                        <span className="font-medium text-green-600">Bought: {item.dec}</span> • 
+                        <span className="font-medium"> Need: {item.inc}</span>
                       </div>
                     </div>
                     
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => increaseNeeded(item.item)}
-                        className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center gap-1"
-                        title="Add one more needed"
-                      >
-                        <span>+</span>
-                        <span>Need</span>
-                      </button>
-                      
                       <button
                         onClick={() => increaseBought(item.item)}
                         className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 flex items-center gap-1"
@@ -518,6 +508,15 @@ function App() {
                       >
                         <span>+</span>
                         <span>Bought</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => increaseNeeded(item.item)}
+                        className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center gap-1"
+                        title="Add one more needed"
+                      >
+                        <span>+</span>
+                        <span>Need</span>
                       </button>
                       
                       <button

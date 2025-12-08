@@ -139,15 +139,33 @@ export function createList(db, list){
  */
 export function updateList(db, list){
     return new Promise((resolve, reject) => {
+        // Check if listId is a UUID or database id
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isUuid = uuidRegex.test(list.listId);
+        
+        const updateQuery = isUuid 
+            ? "UPDATE list SET name = ? WHERE globalId = ?"
+            : "UPDATE list SET name = ? WHERE id = ?";
+        const updateParams = isUuid 
+            ? [list.name, list.listId]
+            : [list.name, parseInt(list.listId)];
+        
         db.run(
-            "UPDATE list SET name = ? WHERE globalId = ?",
-            [list.name, list.listId],
+            updateQuery,
+            updateParams,
             (err) => {
                 if (err) return reject(err);
 
+                const selectQuery = isUuid 
+                    ? "SELECT id FROM list WHERE globalId = ?"
+                    : "SELECT id FROM list WHERE id = ?";
+                const selectParams = isUuid 
+                    ? [list.listId]
+                    : [parseInt(list.listId)];
+
                 db.get(
-                "SELECT id FROM list WHERE globalId = ?",
-                [list.listId],
+                selectQuery,
+                selectParams,
                 (getErr, row) => {
                     if (getErr) return reject(getErr);
                     if (!row) return reject(new Error("List not found"));
