@@ -53,6 +53,8 @@ export default class ShoppingList {
                 dec: counter ? counter.n.read() : 0
             });
         }
+        // sort alphabetically to maintain consistent order
+        result.sort((a, b) => a.item.localeCompare(b.item));
         return result;
     }
 
