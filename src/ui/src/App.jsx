@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
@@ -59,11 +59,10 @@ function App() {
     if (!newListName.trim()) return
 
     try {
-      const listId = newListName.toLowerCase().replace(/\s+/g, '-')
       const response = await fetch(`${API_URL}/lists`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listId, name: newListName })
+        body: JSON.stringify({ name: newListName })
       })
       
       if (response.ok) {
@@ -105,7 +104,6 @@ function App() {
     if (!window.confirm(`Are you sure you want to delete "${listName}"?`)) return
 
     try {
-      // Remove from UI (no backend delete endpoint yet)
       setLists(prev => prev.filter(list => list.listId !== listId))
       if (currentList?.listId === listId) {
         setCurrentList(null)
@@ -125,7 +123,7 @@ function App() {
   }
 
   const shareList = (listId, listName) => {
-    // Share the listId so others can join
+    // Copy the listId to clipboard for sharing
     navigator.clipboard.writeText(listId)
     console.log(`List ID copied: ${listId}`)
   }
@@ -138,7 +136,7 @@ function App() {
       })
       
       if (response.ok) {
-        // Reload lists to show updated data with globalIds
+        // Reload lists to show updated data with globalIDs
         await loadAllLists()
       } else {
         const error = await response.json()
@@ -492,7 +490,6 @@ function App() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">🛒</div>
                 <p className="text-gray-600 text-lg">No items in this list yet. Add some items above!</p>
               </div>
             )}

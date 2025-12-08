@@ -5,7 +5,7 @@ import WebSocket, { WebSocketServer } from "ws";
 
 if (cluster.isPrimary) {
   // Initialize the proxy in the primary worker
-  const hashing = new ConsistentHashRing([0, 1, 2]);
+  const hashing = new ConsistentHashRing([0, 1, 2, 3, 4]);
 
   function runProxy() {
     // Frontend: clients connect here via WebSocket
@@ -29,9 +29,13 @@ if (cluster.isPrimary) {
         // Decide the node using consistent hashing
         let preferenceList = [];
         if (message.type === "sync") {
-          if (message.list.listId === null) {
-            // no global id so a new one is created
-            message.list.listId = randomUUID();
+          // Check if listId is a UUID format (globalId), if not assign a new globalId
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!message.list.listId || !uuidRegex.test(message.list.listId)) {
+            // List has local database ID, assign a globalId (UUID) for distributed system
+            const globalId = randomUUID();
+            message.list.listId = globalId;
+            console.log(`Assigned globalId ${globalId} to list: ${message.list.name}`);
           }
           preferenceList = hashing.getPreferenceList(message.list.listId.toString(), 3);
         } else if (message.type === "get") {

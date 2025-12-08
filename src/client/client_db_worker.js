@@ -11,8 +11,20 @@ const db = new Database(workerData.dbPath);
  * Updates or creates a list in the database
  */
 function updateListInDB(list) {
-  const stmt = db.prepare("SELECT * FROM list WHERE globalId = ?;");
-  stmt.all(list.listId, (err, rows) => {
+  // Check if listId is a UUID or database id
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
+  let query, params;
+  if (uuidRegex.test(list.listId)) {
+    query = "SELECT * FROM list WHERE globalId = ?;";
+    params = [list.listId];
+  } else {
+    query = "SELECT * FROM list WHERE id = ?;";
+    params = [parseInt(list.listId)];
+  }
+  
+  const stmt = db.prepare(query);
+  stmt.all(params, (err, rows) => {
     stmt.finalize();
 
     if (err) {
@@ -32,15 +44,28 @@ function updateListInDB(list) {
  * Soft deletes a list from the database
  */
 function deleteListInDB(listId) {
-  db.run(
-    "UPDATE list SET soft_delete = 1 WHERE globalId = ?",
-    [listId],
-    (err) => {
-      if (err) console.error("Error deleting list:", err);
-      else console.log(`List ${listId} soft deleted`);
-    }
-  );
-  console.log(`Requested deletion of list ${listId}`);
+  // Try to delete by globalId first (UUID), then fall back to id (database ID)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
+  if (uuidRegex.test(listId)) {
+    db.run(
+      "UPDATE list SET soft_delete = 1 WHERE globalId = ?",
+      [listId],
+      (err) => {
+        if (err) console.error("Error deleting list:", err);
+        else console.log(`List ${listId} soft deleted (by globalId)`);
+      }
+    );
+  } else {
+    db.run(
+      "UPDATE list SET soft_delete = 1 WHERE id = ?",
+      [parseInt(listId)],
+      (err) => {
+        if (err) console.error("Error deleting list:", err);
+        else console.log(`List ${listId} soft deleted (by id)`);
+      }
+    );
+  }
 }
 
 // Handle messages from parent

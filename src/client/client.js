@@ -71,8 +71,11 @@ async function loadListsFromDatabase() {
     localLists.clear();
     
     for (const { list, products } of listsData) {
+      // Use globalId if it exists and is a UUID, otherwise use database id
+      const listId = list.globalId || list.id.toString();
+      
       // Create ShoppingList and restore items
-      const shoppingList = new ShoppingList(1, list.globalId, list.name);
+      const shoppingList = new ShoppingList(1, listId, list.name);
       
       for (const product of products) {
         // Add item with its quantity
@@ -85,7 +88,7 @@ async function loadListsFromDatabase() {
         }
       }
       
-      localLists.set(list.globalId, shoppingList);
+      localLists.set(listId, shoppingList);
     }
     
     console.log(`Loaded ${localLists.size} lists from database`);
@@ -158,21 +161,36 @@ app.get("/lists/:listID", (req, res) => {
 });
 
 // Create a new list
-app.post("/lists", (req, res) => {
-  const { listId, name } = req.body;
-  if (!name || !listId) {
-    return res.status(400).json({ error: "Missing required fields" });
+app.post("/lists", async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "Missing name field" });
   }
-  if (localLists.has(listId)) {
-    return res.status(409).json({ error: "List with this ID already exists" });
+  
+  try {
+    // insert into db
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        "INSERT INTO list (name) VALUES (?)",
+        [name],
+        function (err) {
+          if (err) return reject(err);
+          resolve({ listId: this.lastID });
+        }
+      );
+    });
+    
+    const dbId = result.listId.toString();
+    
+    // Create the actual list with the database ID
+    const newList = new ShoppingList(1, dbId, name);
+    localLists.set(dbId, newList);
+    
+    res.status(201).json({ list: newList.toJson() });
+  } catch (err) {
+    console.error("Error creating list:", err);
+    res.status(500).json({ error: "Failed to create list" });
   }
-  const newList = new ShoppingList(1, listId, name);
-  localLists.set(listId, newList);
-  
-  // Save to database via worker
-  db_worker.postMessage({ type: "create", list: newList.toJson() });
-  
-  res.status(201).json({ list: newList.toJson() });
 });
 
 // Delete a list
@@ -182,6 +200,7 @@ app.delete("/lists/:listId", (req, res) => {
     localLists.delete(listId);
     
     // Soft delete in database via worker
+    console.log(`Deleting list ${listId} from database`);
     db_worker.postMessage({ type: "delete", listId });
     
     res.json({ message: "List deleted" });
@@ -254,21 +273,28 @@ app.post("/sync", async (req, res) => {
   try {
     const socket = new WebSocket("ws://127.0.0.1:5555");
     let syncResults = [];
-    let pendingMessages = 0;
+    let pendingReplies = 0;
+    let requestCounter = 0;
+    const requestTracker = new Map(); // Maps requestId → local listId (to match replies)
 
     socket.on("open", () => {
       console.log("Connected to proxy for sync");
       isOnline = true;
 
-      // Send all local lists to server
-      localLists.forEach((list) => {
-        pendingMessages++;
-        const message = { type: "sync", list: list.toJson() };
-        socket.send(JSON.stringify(message));
+      // Send each list with a unique requestId to track the response
+      localLists.forEach((list, localListId) => {
+        const requestId = `sync-${requestCounter++}`;
+        requestTracker.set(requestId, localListId);
+        pendingReplies++;
+        
+        socket.send(JSON.stringify({ 
+          type: "sync", 
+          list: list.toJson(),
+          requestId
+        }));
       });
 
-      // If no lists to sync, close immediately
-      if (pendingMessages === 0) {
+      if (pendingReplies === 0) {
         socket.close();
       }
     });
@@ -278,102 +304,57 @@ app.post("/sync", async (req, res) => {
         const reply = JSON.parse(data.toString());
         console.log("Sync reply:", reply);
         
-        if (reply.code === 200 && reply.list) {
-          // Update local list with globalId from server
-          const serverList = reply.list;
-          if (serverList.listId && localLists.has(serverList.listId)) {
-            const localList = localLists.get(serverList.listId);
-            // Merge server data if needed
-            syncResults.push({ listId: serverList.listId, status: 'synced' });
+        if (reply.code === 200 && reply.list && reply.requestId) {
+          const localListId = requestTracker.get(reply.requestId);
+          const returnedGlobalId = reply.list.listId;
+          
+          if (!localListId) {
+            console.error("Received reply for unknown request:", reply.requestId);
+            pendingReplies--;
+            if (pendingReplies === 0) socket.close();
+            return;
+          }
+          
+          const listToUpdate = localLists.get(localListId);
+          
+          if (listToUpdate && returnedGlobalId !== localListId) {
+            // Proxy assigned a new globalId (UUID) - update everything
+            listToUpdate.listId = returnedGlobalId;
+            localLists.delete(localListId);
+            localLists.set(returnedGlobalId, listToUpdate);
+            
+            // Persist the globalId to database
+            db.run(
+              "UPDATE list SET globalId = ? WHERE id = ?",
+              [returnedGlobalId, parseInt(localListId)],
+              (err) => {
+                if (err) console.error("Failed to update globalId:", err);
+                else console.log(`Synced: ${listToUpdate.name} (${localListId} → ${returnedGlobalId})`);
+              }
+            );
+            
+            syncResults.push({ 
+              name: listToUpdate.name,
+              globalId: returnedGlobalId, 
+              status: 'synced' 
+            });
+          } else if (listToUpdate) {
+            syncResults.push({ 
+              name: listToUpdate.name,
+              globalId: returnedGlobalId, 
+              status: 'already-synced' 
+            });
           }
         }
 
-        pendingMessages--;
-        if (pendingMessages === 0) {
+        pendingReplies--;
+        if (pendingReplies === 0) {
           socket.close();
         }
       } catch (err) {
         console.error("Error parsing sync reply:", err);
-        pendingMessages--;
-        if (pendingMessages === 0) {
-          socket.close();
-        }
-      }
-    });
-
-    socket.on("close", () => {
-      console.log("Disconnected from proxy after sync");
-      res.json({ online: isOnline, syncResults });
-    });
-
-    socket.on("error", (err) => {
-      console.error("Sync connection error:", err);
-      isOnline = false;
-      socket.close();
-      res.status(500).json({ error: "Sync failed", online: false });
-    });
-
-    setTimeout(() => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
-        res.status(408).json({ error: "Sync timeout", online: false });
-      }
-    }, 10000);
-
-  } catch (error) {
-    console.error("Sync error:", error);
-    isOnline = false;
-    res.status(500).json({ error: error.message, online: false });
-  }
-});
-
-// Sync with server
-app.post("/sync", async (req, res) => {
-  try {
-    const socket = new WebSocket("ws://127.0.0.1:5555");
-    let syncResults = [];
-    let pendingMessages = 0;
-
-    socket.on("open", () => {
-      console.log("Connected to proxy for sync");
-      isOnline = true;
-
-      // Send all local lists to server
-      localLists.forEach((list) => {
-        pendingMessages++;
-        const message = { type: "sync", list: list.toJson() };
-        socket.send(JSON.stringify(message));
-      });
-
-      // If no lists to sync, close immediately
-      if (pendingMessages === 0) {
-        socket.close();
-      }
-    });
-
-    socket.on("message", (data) => {
-      try {
-        const reply = JSON.parse(data.toString());
-        console.log("Sync reply:", reply);
-        
-        if (reply.code === 200 && reply.list) {
-          // Update local list with globalId from server
-          const serverList = reply.list;
-          if (serverList.listId && localLists.has(serverList.listId)) {
-            const localList = localLists.get(serverList.listId);
-            // Merge server data if needed
-            syncResults.push({ listId: serverList.listId, status: 'synced' });
-          }
-        }
-
-        pendingMessages--;
-        if (pendingMessages === 0) {
-          socket.close();
-        }
-      } catch (err) {
-        console.error("Error parsing sync reply:", err);
-        pendingMessages--;
-        if (pendingMessages === 0) {
+        pendingReplies--;
+        if (pendingReplies === 0) {
           socket.close();
         }
       }
