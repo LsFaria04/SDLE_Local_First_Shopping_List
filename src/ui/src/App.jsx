@@ -10,15 +10,8 @@ function App() {
   const [joinListId, setJoinListId] = useState('')
   const [view, setView] = useState('all-lists')
   const [syncing, setSyncing] = useState(false)
-  const [toast, setToast] = useState(null)
 
   const API_URL = 'http://localhost:3000'
-
-  // Show toast notification
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   // Load lists on mount
   useEffect(() => {
@@ -137,7 +130,6 @@ function App() {
   const shareList = (listId, listName) => {
     // Copy the listId to clipboard for sharing
     navigator.clipboard.writeText(listId)
-    showToast(`List ID copied to clipboard!`, 'success')
     console.log(`List ID copied: ${listId}`)
   }
 
@@ -282,17 +274,6 @@ function App() {
 
   return (
     <div className="container mx-auto p-4 max-w-6xl">
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
-          toast.type === 'success' ? 'bg-green-500' : 
-          toast.type === 'error' ? 'bg-red-500' : 
-          'bg-blue-500'
-        } text-white font-medium animate-fade-in`}>
-          {toast.message}
-        </div>
-      )}
-
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold text-blue-600 mb-2">🛒 Listify</h1>
         <p className="text-gray-600">Collaborative shopping lists made easy</p>

@@ -150,13 +150,83 @@ app.get("/lists", (req, res) => {
 });
 
 // Get a specific list by ID
-app.get("/lists/:listID", (req, res) => {
+app.get("/lists/:listID", async (req, res) => {
   const listID = req.params.listID;
   const list = localLists.get(listID);
+  
   if (list) {
+    // list exists locally
     res.json({ list: list.toJson() });
   } else {
-    res.status(404).json({ error: "List not found" });
+    // try to fetch from server via proxy
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(listID)) {
+      return res.status(404).json({ error: "List not found locally and ID is not a valid UUID" });
+    }
+    
+    try {
+      const socket = new WebSocket("ws://127.0.0.1:5555");
+      let fetchedList = null;
+      
+      socket.on("open", () => {
+        console.log(`Fetching list ${listID} from server`);
+        socket.send(JSON.stringify({ type: "get", listId: listID }));
+      });
+      
+      socket.on("message", (data) => {
+        try {
+          const reply = JSON.parse(data.toString());
+          if (reply.code === 200 && reply.list) {
+            fetchedList = reply.list;
+            
+            const shoppingList = new ShoppingList(reply.list.replica_id, reply.list.listId, reply.list.name);
+            
+            if (reply.list.itemsDisplay) {
+              for (const item of reply.list.itemsDisplay) {
+                for (let i = 0; i < item.inc; i++) {
+                  shoppingList.addItem(item.item, 1);
+                }
+                for (let i = 0; i < item.dec; i++) {
+                  shoppingList.markBought(item.item, 1);
+                }
+              }
+            }
+            
+            localLists.set(reply.list.listId, shoppingList);
+            
+            db_worker.postMessage({ type: "create", list: shoppingList.toJson() });
+            
+            socket.close();
+            res.json({ list: shoppingList.toJson() });
+          } else {
+            socket.close();
+            res.status(404).json({ error: "List not found on server" });
+          }
+        } catch (err) {
+          console.error("Error parsing server reply:", err);
+          socket.close();
+          res.status(500).json({ error: "Failed to parse server response" });
+        }
+      });
+      
+      socket.on("error", (err) => {
+        console.error("Error fetching list from server:", err);
+        socket.close();
+        res.status(500).json({ error: "Failed to fetch list from server" });
+      });
+      
+      setTimeout(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+          res.status(408).json({ error: "Fetch timeout" });
+        }
+      }, 5000);
+      
+    } catch (error) {
+      console.error("Error fetching list:", error);
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
