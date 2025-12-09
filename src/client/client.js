@@ -13,7 +13,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.join(__dirname, "../database/local_db.db");
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: function (origin, callback) {
+
+    if (['http://localhost:3000', 'http://127.0.0.1:5173'].includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },}));
 app.use(express.json());
 
 let localLists = new Map(); // Local shopping lists

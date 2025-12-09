@@ -47,7 +47,6 @@ function App() {
   const loadList = async (listId) => {
     try {
       const list = await fetchList(listId)
-      console.log('Loaded list:', list)
       setCurrentList(list)
       setView('list-detail')
     } catch (error) {
