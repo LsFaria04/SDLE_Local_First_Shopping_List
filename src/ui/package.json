@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_API_URL=http://localhost:3000 vite",
+    "dev2": "VITE_API_URL=http://localhost:4000 vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

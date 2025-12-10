@@ -151,11 +151,9 @@ async function syncLists(incomingJson) {
         returningList = existing;
       } else {
           shoppingLists.set(incoming.listId, incoming);
-          returningList = incoming;
-          
+          returningList = incoming;   
       }
     });
-
     return returningList;
    
 }

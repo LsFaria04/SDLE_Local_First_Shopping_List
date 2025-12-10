@@ -11,7 +11,8 @@ function App() {
   const [view, setView] = useState('all-lists')
   const [syncing, setSyncing] = useState(false)
 
-  const API_URL = 'http://localhost:3000'
+
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Load lists on mount
   useEffect(() => {

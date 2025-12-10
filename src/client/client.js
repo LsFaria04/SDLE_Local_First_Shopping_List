@@ -10,12 +10,13 @@ import { loadLists } from "../server/database_operations.js";
 
 const { Database } = pkg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "../database/local_db.db");
+const dbNum = process.argv[2] ? "2" : "";
+const dbPath = path.join(__dirname, `../database/local_db${dbNum}.db`);
 
 const app = express();
 app.use(cors({ origin: function (origin, callback) {
 
-    if (['http://localhost:3000', 'http://127.0.0.1:5173'].includes(origin)) {
+    if (['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'].includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -25,7 +26,7 @@ app.use(express.json());
 
 let localLists = new Map(); // Local shopping lists
 let isOnline = false; // Online status
-const port = 3000;
+const port = process.argv[2] || 3000;
 
 // Database connection
 const db = new Database(dbPath, (err) => {
@@ -390,7 +391,7 @@ app.post("/sync", async (req, res) => {
     socket.on("message", (data) => {
       try {
         const reply = JSON.parse(data.toString());
-        console.log("Sync reply:", reply);
+        console.log("Sync reply:", reply.list);
         
         if (reply.code === 200 && reply.list && reply.requestId) {
           const localListId = requestTracker.get(reply.requestId);
@@ -420,6 +421,10 @@ app.post("/sync", async (req, res) => {
                 else console.log(`Synced: ${listToUpdate.name} (${localListId} → ${returnedGlobalId})`);
               }
             );
+
+            //Sync the local list
+            const incoming = ShoppingList.fromJson(reply.list);
+            listToUpdate.merge(incoming);
             
             syncResults.push({ 
               name: listToUpdate.name,
@@ -427,12 +432,19 @@ app.post("/sync", async (req, res) => {
               status: 'synced' 
             });
           } else if (listToUpdate) {
+            //Sync the local list
+            const incoming = ShoppingList.fromJson(reply.list);
+            listToUpdate.merge(incoming);
+
             syncResults.push({ 
               name: listToUpdate.name,
               globalId: returnedGlobalId, 
               status: 'already-synced' 
             });
           }
+
+          //store the the updated lists
+          localLists.set(returnedGlobalId, listToUpdate);
         }
 
         pendingReplies--;

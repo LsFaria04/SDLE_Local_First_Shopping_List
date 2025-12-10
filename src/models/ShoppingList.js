@@ -44,9 +44,11 @@ export default class ShoppingList {
 
     getItemsForDisplay() {
         const items = this.items.read();
+        console.log(items);
         const result = [];
         for (const item of items) {
             const counter = this.quantities.get(item);
+            console.log(counter.p.read())
             result.push({
                 item: item,
                 inc: counter ? counter.p.read() : 0,

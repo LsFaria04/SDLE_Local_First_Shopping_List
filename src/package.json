@@ -12,7 +12,9 @@
   "scripts": {
     "start:server": "node server/server.js",
     "start:client": "node client/client.js",
+    "start:client2": "node client/client.js 4000",
     "start:ui": "npm --prefix ui run dev",
+    "start:ui2": "npm --prefix ui run dev2 -- --port 5174",
     "start:proxy": "node proxy/proxy.js",
     "start:all": "concurrently \"npm run start:proxy\" \"wait-on tcp:5556 && npm run start:server\" \"wait-on tcp:5555 && npm run start:client\" \"npm run start:ui\""
   },
