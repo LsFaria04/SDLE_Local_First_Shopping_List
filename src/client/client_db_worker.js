@@ -10,31 +10,7 @@ const db = new Database(workerData.dbPath);
 /**
  * Updates or creates a list in the database
  */
-function updateListInDB(list, oldListId = null) {
-  // If oldListId is provided (transitioning from DB ID to UUID), use it
-  if (oldListId !== null) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
-    // First, update the globalId on the existing row
-    db.run(
-      "UPDATE list SET globalId = ? WHERE id = ?",
-      [list.listId, parseInt(oldListId)],
-      (err) => {
-        if (err) {
-          console.error("Failed to update globalId:", err);
-          return;
-        }
-        console.log(`Updated globalId: ${oldListId} → ${list.listId}`);
-        
-        // Now update the list contents
-        updateList(db, list).catch(updateErr => {
-          console.error("Failed to update list after setting globalId:", updateErr);
-        });
-      }
-    );
-    return;
-  }
-  
+function updateListInDB(list) {
   // Check if listId is a UUID or database id
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   

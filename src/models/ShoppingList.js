@@ -130,15 +130,13 @@ export default class ShoppingList {
         // Merge items (AWORSet)
         this.items.join(otherList.items);
 
-
+        
         // Merge quantities (PNCounters)
         for (const [itemName, otherCounter] of otherList.quantities) {
             if (!this.quantities.has(itemName)) {
                 this.quantities.set(itemName, new PNCounter(this.replicaId));
             }
-            console.log("Merging item:", itemName, "Counter before merge:", this.quantities.get(itemName).toJson(), "with", otherCounter.toJson());
             this.quantities.get(itemName).join(otherCounter);
-            console.log("Merging item:", itemName, "Counter after merge:", this.quantities.get(itemName).toJson());
         }
     }
 

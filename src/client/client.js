@@ -411,19 +411,20 @@ app.post("/sync", async (req, res) => {
           
           if (listToUpdate && returnedGlobalId !== localListId) {
             // Proxy assigned a new globalId (UUID) - update everything
-            // Merge server state with local state
-            listToUpdate.merge(globalList);
             listToUpdate.listId = returnedGlobalId;
             localLists.delete(localListId);
-            localLists.set(returnedGlobalId, listToUpdate);
+            localLists.set(returnedGlobalId, globalList);
             
-            // Persist merged state and update globalId to database via worker
-            // Pass the old database ID so the worker can update the correct row
-            db_worker.postMessage({ 
-              type: "update", 
-              list: listToUpdate.toJson(),
-              oldListId: localListId  // Pass the database ID for WHERE clause
-            });
+            // Persist the globalId to database
+            db.run(
+              "UPDATE list SET globalId = ? WHERE id = ?",
+              [returnedGlobalId, parseInt(localListId)],
+              (err) => {
+                if (err) console.error("Failed to update globalId:", err);
+                else console.log(`Synced: ${listToUpdate.name} (${localListId} → ${returnedGlobalId})`);
+              }
+            );
+
             
             syncResults.push({ 
               name: listToUpdate.name,
@@ -432,15 +433,8 @@ app.post("/sync", async (req, res) => {
             });
           } else if (listToUpdate) {
 
-            // Merge the server state with local state
-            listToUpdate.merge(globalList);
-            
-            // Store the merged list back
-            localLists.set(returnedGlobalId, listToUpdate);
-            
-            // Persist merged state to database
-            db_worker.postMessage({ type: "update", list: listToUpdate.toJson() });
-            
+            //store the the updated lists
+            localLists.set(returnedGlobalId, globalList);
             console.log(localLists)
             syncResults.push({ 
               name: listToUpdate.name,
