@@ -154,6 +154,7 @@ async function syncLists(incomingJson) {
           returningList = incoming;   
       }
     });
+    console.log(returningList);
     return returningList;
    
 }

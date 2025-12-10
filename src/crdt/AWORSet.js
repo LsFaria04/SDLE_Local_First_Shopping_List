@@ -23,7 +23,7 @@ export default class AWORSet {
 
     // Add item to the set
     add(val){
-        const res = new AWORSet();
+        const res = new AWORSet(this.id);
 
         res.dk = this.dk.rmv(val);
 
@@ -45,7 +45,7 @@ export default class AWORSet {
 
     // Remove item from the set
     rmv(val){
-        const res = new AWORSet();
+        const res = new AWORSet(this.id);
 
         res.dk = this.dk.rmv(val);
         
@@ -59,7 +59,7 @@ export default class AWORSet {
 
     // Delete the entire set (for cleanup)
     reset(){
-        const res = new AWORSet();
+        const res = new AWORSet(this.id);
         res.dk = this.dk.rmvAll();
         return res;
     }

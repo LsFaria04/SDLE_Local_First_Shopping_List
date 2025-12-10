@@ -44,11 +44,9 @@ export default class ShoppingList {
 
     getItemsForDisplay() {
         const items = this.items.read();
-        console.log(items);
         const result = [];
         for (const item of items) {
             const counter = this.quantities.get(item);
-            console.log(counter.p.read())
             result.push({
                 item: item,
                 inc: counter ? counter.p.read() : 0,
@@ -130,7 +128,12 @@ export default class ShoppingList {
 
     merge(otherList){
         // Merge items (AWORSet)
+        console.log(otherList)
+        console.log(this.items);
         this.items.join(otherList.items);
+        console.log(this.items);
+
+        
         
         // Merge quantities (PNCounters)
         for (const [itemName, otherCounter] of otherList.quantities) {

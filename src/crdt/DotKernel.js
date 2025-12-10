@@ -63,7 +63,7 @@ export default class DotKernel {
             
             // If other's context knows this dot but doesn't have it in ds,
             // it means other removed it - so we should remove it too
-            if (otherKernel.c.dotin([replicaId, counter])) {
+            if (otherKernel.c.dotin([replicaId, counter]) && !otherKernel.ds.has(dotStr)) {
                 this.ds.delete(dotStr);
             }
         }

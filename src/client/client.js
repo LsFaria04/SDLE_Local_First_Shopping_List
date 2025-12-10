@@ -375,6 +375,8 @@ app.post("/sync", async (req, res) => {
         const requestId = `sync-${requestCounter++}`;
         requestTracker.set(requestId, localListId);
         pendingReplies++;
+
+        console.log(list.toJson());
         
         socket.send(JSON.stringify({ 
           type: "sync", 
@@ -405,12 +407,13 @@ app.post("/sync", async (req, res) => {
           }
           
           const listToUpdate = localLists.get(localListId);
+          const globalList = ShoppingList.fromJson(reply.list);
           
           if (listToUpdate && returnedGlobalId !== localListId) {
             // Proxy assigned a new globalId (UUID) - update everything
             listToUpdate.listId = returnedGlobalId;
             localLists.delete(localListId);
-            localLists.set(returnedGlobalId, listToUpdate);
+            localLists.set(returnedGlobalId, globalList);
             
             // Persist the globalId to database
             db.run(
@@ -422,9 +425,6 @@ app.post("/sync", async (req, res) => {
               }
             );
 
-            //Sync the local list
-            const incoming = ShoppingList.fromJson(reply.list);
-            listToUpdate.merge(incoming);
             
             syncResults.push({ 
               name: listToUpdate.name,
@@ -432,10 +432,10 @@ app.post("/sync", async (req, res) => {
               status: 'synced' 
             });
           } else if (listToUpdate) {
-            //Sync the local list
-            const incoming = ShoppingList.fromJson(reply.list);
-            listToUpdate.merge(incoming);
 
+            //store the the updated lists
+            localLists.set(returnedGlobalId, globalList);
+            console.log(localLists)
             syncResults.push({ 
               name: listToUpdate.name,
               globalId: returnedGlobalId, 
@@ -443,8 +443,7 @@ app.post("/sync", async (req, res) => {
             });
           }
 
-          //store the the updated lists
-          localLists.set(returnedGlobalId, listToUpdate);
+          
         }
 
         pendingReplies--;

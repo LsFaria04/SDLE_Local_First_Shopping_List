@@ -4,21 +4,21 @@ import GCounter from './GCounter.js';
 export default class PNCounter {
 
     constructor(id = null){
-
+        this.id = id;
         this.p = new GCounter(id);
         this.n = new GCounter(id);
 
     }
 
     inc(amount = 1) {
-        const res = new PNCounter();  
+        const res = new PNCounter(this.id);  
         res.p = this.p.inc(amount);
         res.n = this.n; 
         return res;
     }
 
     dec(amount = 1) {
-        const res = new PNCounter();
+        const res = new PNCounter(this.id);
         res.p = this.p; 
         res.n = this.n.inc(amount); 
         return res;

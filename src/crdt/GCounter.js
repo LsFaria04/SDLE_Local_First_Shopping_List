@@ -11,7 +11,7 @@ export default class GCounter {
     }
 
     inc(amount = 1){
-        const res = new GCounter();  // Delta has no ID (not mutable)
+        const res = new GCounter(this.id);  // Delta has no ID (not mutable)
         
         const currentVal = this.counters.get(this.id) || 0;
         this.counters.set(this.id, currentVal + amount);
