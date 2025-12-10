@@ -143,12 +143,15 @@ runWorker(process.env.SERVER_ID, process.env.PORT);
  */
 async function syncLists(incomingJson) {
     const incoming = ShoppingList.fromJson(incomingJson);
+    console.log("Incoming list:", incoming.toJson());
     let returningList = incoming;
     await lock.runExclusive(async () => {
        if (shoppingLists.has(incoming.listId)) {
         const existing = shoppingLists.get(incoming.listId);
+        console.log("Existing list before merge:", existing.toJson());
         existing.merge(incoming);
         returningList = existing;
+        console.log("Existing list after merge:", returningList.toJson());
       } else {
           shoppingLists.set(incoming.listId, incoming);
           returningList = incoming;   
@@ -208,8 +211,8 @@ async function initShoppingLists(db) {
       list.name
     );
     for (const product of products) {
-      shoppingList.addItem(product.name, product.quantity);
-      shoppingList.markBought(product.name, product.bought);
+      // Restore item directly from database values without incrementing
+      shoppingList.restoreItem(product.name, product.quantity, product.bought);
     }
     shoppingLists.set(list.globalId, shoppingList);
   }

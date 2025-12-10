@@ -86,14 +86,8 @@ async function loadListsFromDatabase() {
       const shoppingList = new ShoppingList(1, listId, list.name);
       
       for (const product of products) {
-        // Add item with its quantity
-        for (let i = 0; i < product.quantity; i++) {
-          shoppingList.addItem(product.name, 1);
-        }
-        // Mark bought items
-        for (let i = 0; i < product.bought; i++) {
-          shoppingList.markBought(product.name, 1);
-        }
+        // Restore item directly from database values without incrementing
+        shoppingList.restoreItem(product.name, product.quantity, product.bought);
       }
       
       localLists.set(listId, shoppingList);
@@ -188,18 +182,8 @@ app.get("/lists/:listID", async (req, res) => {
           if (reply.code === 200 && reply.list) {
             fetchedList = reply.list;
             
-            const shoppingList = new ShoppingList(reply.list.replica_id, reply.list.listId, reply.list.name);
-            
-            if (reply.list.itemsDisplay) {
-              for (const item of reply.list.itemsDisplay) {
-                for (let i = 0; i < item.inc; i++) {
-                  shoppingList.addItem(item.item, 1);
-                }
-                for (let i = 0; i < item.dec; i++) {
-                  shoppingList.markBought(item.item, 1);
-                }
-              }
-            }
+            // Use fromJson to properly restore the list with correct replicaId
+            const shoppingList = ShoppingList.fromJson(reply.list);
             
             localLists.set(reply.list.listId, shoppingList);
             
@@ -410,6 +394,7 @@ app.post("/sync", async (req, res) => {
           const globalList = ShoppingList.fromJson(reply.list);
           
           if (listToUpdate && returnedGlobalId !== localListId) {
+            console.log(`Updating local list ID ${localListId} to global ID ${returnedGlobalId}`);
             // Proxy assigned a new globalId (UUID) - update everything
             listToUpdate.listId = returnedGlobalId;
             localLists.delete(localListId);
@@ -433,6 +418,7 @@ app.post("/sync", async (req, res) => {
             });
           } else if (listToUpdate) {
 
+            console.log(`List ${listToUpdate.name} already synced with global ID ${returnedGlobalId}`);
             //store the the updated lists
             localLists.set(returnedGlobalId, globalList);
             console.log(localLists)

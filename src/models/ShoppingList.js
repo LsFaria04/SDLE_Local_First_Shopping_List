@@ -140,4 +140,27 @@ export default class ShoppingList {
         }
     }
 
+    /**
+     * Restore item from database values by directly setting counter values
+     * instead of incrementing (which would modify the CRDT state)
+     */
+    restoreItem(name, incValue, decValue) {
+        // Add item to the set
+        this.items.add(name);
+        
+        // Create PNCounter and directly set the values
+        const counter = new PNCounter(this.replicaId);
+        
+        // Directly set the counter values for this replica (use String for consistency)
+        const key = String(this.replicaId);
+        if (incValue > 0) {
+            counter.p.counters.set(key, incValue);
+        }
+        if (decValue > 0) {
+            counter.n.counters.set(key, decValue);
+        }
+        
+        this.quantities.set(name, counter);
+    }
+
 }   
