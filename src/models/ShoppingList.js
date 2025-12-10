@@ -128,12 +128,8 @@ export default class ShoppingList {
 
     merge(otherList){
         // Merge items (AWORSet)
-        console.log(otherList)
-        console.log(this.items);
         this.items.join(otherList.items);
-        console.log(this.items);
 
-        
         
         // Merge quantities (PNCounters)
         for (const [itemName, otherCounter] of otherList.quantities) {
