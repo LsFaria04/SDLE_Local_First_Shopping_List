@@ -4,8 +4,7 @@ import ConsistentHashRing from "../dynamo-core/consistent_hash.js";
 
 const serverID = workerData.id; //current base port is 6000
 const numberOfNeighbors = workerData.numberOfNeighbors;
-const basePort = 7000;
-const hashing = new ConsistentHashRing([0, 1, 2]); //used to get the neighbors
+const hashing = new ConsistentHashRing([0, 1, 2,3,4]); //used to get the neighbors
 
 /**
  * Updates a neighbor server list with the new list information from the current server
