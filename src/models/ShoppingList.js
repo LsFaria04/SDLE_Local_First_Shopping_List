@@ -3,10 +3,11 @@ import AWORSet from '../crdt/AWORSet.js';
 
 export default class ShoppingList {
 
-    constructor(replicaId, listId, name){
+    constructor(replicaId, listId, name, deleted){
         this.replicaId = replicaId;
         this.listId = listId;
         this.name = name;
+        this.deleted = deleted;
         
         this.items = new AWORSet(replicaId);
         this.quantities = new Map();  // itemName → PNCounter (inc=add, dec=buy)
@@ -23,6 +24,7 @@ export default class ShoppingList {
             replicaId: this.replicaId,
             listId: this.listId,
             name: this.name,
+            deleted : this.deleted,
             items: this.items.toJson(),        // Full AWORSet state
             quantities: quantitiesJson,         // Full PNCounter states
             // Keep backwards-compatible "items" array for UI
@@ -31,7 +33,7 @@ export default class ShoppingList {
     }
 
     static fromJson(json) {
-        const list = new ShoppingList(json.replicaId, json.listId, json.name);
+        const list = new ShoppingList(json.replicaId, json.listId, json.name, json.deleted);
         list.items = AWORSet.fromJson(json.items);
         
         list.quantities = new Map();
@@ -130,7 +132,11 @@ export default class ShoppingList {
         // Merge items (AWORSet)
         this.items.join(otherList.items);
 
-        
+        // The other list was flagged has deleted so this will also be
+        if(otherList.deleted) {
+            this.deleted = true;
+        }
+
         // Merge quantities (PNCounters)
         for (const [itemName, otherCounter] of otherList.quantities) {
             if (!this.quantities.has(itemName)) {

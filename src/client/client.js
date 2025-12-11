@@ -83,7 +83,7 @@ async function loadListsFromDatabase() {
       const listId = list.globalId || list.id.toString();
       
       // Create ShoppingList and restore items
-      const shoppingList = new ShoppingList(1, listId, list.name);
+      const shoppingList = new ShoppingList(1, listId, list.name, false);
       
       for (const product of products) {
         // Restore item directly from database values without incrementing
@@ -98,50 +98,6 @@ async function loadListsFromDatabase() {
     console.error("Error loading lists:", err);
   }
 }
-
-/*
-function runClient(identity) {
-  // Just a test shopping list
-  const list = new ShoppingList(1, 2, "teste");
-  list.addItem("teste", 1);
-  list.addItem("product1", 1);
-  list.addItem("product2", 10);
-  list.markBought("product1", 1);
-  list.removeItem("teste");
-
-  // Connect to proxy via WebSocket
-  const socket = new WebSocket("ws://127.0.0.1:5555");
-
-  socket.on("open", () => {
-    console.log(`${identity} connected to proxy`);
-
-    // Message type: "sync" to sync local data with the cloud
-    const message = { type: "sync", list: list.toJson() };
-    socket.send(JSON.stringify(message));
-
-    // Message type: "get" to receive a list with a global id shared by another user
-    const message2 = { type: "get", listId: "2" };
-    socket.send(JSON.stringify(message2));
-  });
-
-  socket.on("message", (data) => {
-    try {
-      const reply = JSON.parse(data.toString());
-      console.log(`${identity} received reply:`, reply);
-    } catch (err) {
-      console.error("Error parsing reply:", err);
-    }
-  });
-
-  socket.on("close", () => {
-    console.log(`${identity} disconnected from proxy`);
-  });
-
-  socket.on("error", (err) => {
-    console.error(`${identity} connection error:`, err);
-  });
-}*/
-
 
 // Get all lists
 app.get("/lists", (req, res) => {
@@ -245,7 +201,7 @@ app.post("/lists", async (req, res) => {
     const dbId = result.listId.toString();
     
     // Create the actual list with the database ID
-    const newList = new ShoppingList(1, dbId, name);
+    const newList = new ShoppingList(1, dbId, name, false);
     localLists.set(dbId, newList);
     
     res.status(201).json({ list: newList.toJson() });
@@ -421,12 +377,12 @@ app.post("/sync", async (req, res) => {
             console.log(`List ${listToUpdate.name} already synced with global ID ${returnedGlobalId}`);
             //store the the updated lists
             localLists.set(returnedGlobalId, globalList);
-            console.log(localLists)
             syncResults.push({ 
               name: listToUpdate.name,
               globalId: returnedGlobalId, 
               status: 'already-synced' 
             });
+            db_worker.postMessage({type: "update", list: globalList.toJson()})
           }
 
           
@@ -483,6 +439,3 @@ initializeDatabase()
     console.error("Failed to initialize:", err);
     process.exit(1);
   });
-
-// Then try to connect to proxy
-//runClient("client-1");

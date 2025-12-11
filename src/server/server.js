@@ -208,7 +208,8 @@ async function initShoppingLists(db) {
     const shoppingList = new ShoppingList(
       process.env.SERVER_ID,
       list.globalId,
-      list.name
+      list.name,
+      false
     );
     for (const product of products) {
       // Restore item directly from database values without incrementing

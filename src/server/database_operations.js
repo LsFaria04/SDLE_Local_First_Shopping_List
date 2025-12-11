@@ -142,13 +142,14 @@ export function updateList(db, list){
         // Check if listId is a UUID or database id
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const isUuid = uuidRegex.test(list.listId);
+
         
         const updateQuery = isUuid 
-            ? "UPDATE list SET name = ? WHERE globalId = ?"
-            : "UPDATE list SET name = ? WHERE id = ?";
+            ? "UPDATE list SET name = ?, soft_delete = ?  WHERE globalId = ?"
+            : "UPDATE list SET name = ?, soft_delete = ?  WHERE id = ?";
         const updateParams = isUuid 
-            ? [list.name, list.listId]
-            : [list.name, parseInt(list.listId)];
+            ? [list.name, list.deleted, list.listId]
+            : [list.name, list.deleted, parseInt(list.listId)];
         
         db.run(
             updateQuery,
