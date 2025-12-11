@@ -343,7 +343,9 @@ app.post("/sync", async (req, res) => {
       });
 
       if (pendingReplies === 0) {
+        res.json({ online: isOnline, syncResults });
         socket.close();
+        return;
       }
     });
 
@@ -359,7 +361,10 @@ app.post("/sync", async (req, res) => {
           if (!localListId) {
             console.error("Received reply for unknown request:", reply.requestId);
             pendingReplies--;
-            if (pendingReplies === 0) socket.close();
+            if (pendingReplies === 0) {
+              res.json({ online: isOnline, syncResults });
+              socket.close();
+            }
             return;
           }
           
@@ -415,20 +420,23 @@ app.post("/sync", async (req, res) => {
 
         pendingReplies--;
         if (pendingReplies === 0) {
+          res.json({ online: isOnline, syncResults });
           socket.close();
+          return;
         }
       } catch (err) {
         console.error("Error parsing sync reply:", err);
         pendingReplies--;
         if (pendingReplies === 0) {
+          res.json({ online: isOnline, syncResults });
           socket.close();
+          return;
         }
       }
     });
 
     socket.on("close", () => {
       console.log("Disconnected from proxy after sync");
-      res.json({ online: isOnline, syncResults });
     });
 
     socket.on("error", (err) => {
