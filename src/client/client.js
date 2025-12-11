@@ -12,6 +12,7 @@ const { Database } = pkg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbNum = process.argv[2] ? "2" : "";
 const dbPath = path.join(__dirname, `../database/local_db${dbNum}.db`);
+const PROXY_PORTS = [5555, 5556, 5557]; 
 
 const app = express();
 app.use(cors({ origin: function (origin, callback) {
@@ -113,71 +114,100 @@ app.get("/lists", (req, res) => {
 app.get("/lists/:listID", async (req, res) => {
   const listID = req.params.listID;
   const list = localLists.get(listID);
-  
+
+  let responded = false;
+  const safeRespond = (status, body) => {
+    if (responded) return;
+    responded = true;
+    if (status) res.status(status).json(body);
+    else res.json(body);
+  };
+
+  //list already exists
   if (list) {
-    // list exists locally
-    res.json({ list: list.toJson() });
-  } else {
-    // try to fetch from server via proxy
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
-    if (!uuidRegex.test(listID)) {
-      return res.status(404).json({ error: "List not found locally and ID is not a valid UUID" });
-    }
-    
-    try {
-      const socket = new WebSocket("ws://127.0.0.1:5555");
-      let fetchedList = null;
-      
-      socket.on("open", () => {
-        console.log(`Fetching list ${listID} from server`);
-        socket.send(JSON.stringify({ type: "get", listId: listID }));
-      });
-      
-      socket.on("message", (data) => {
-        try {
-          const reply = JSON.parse(data.toString());
-          if (reply.code === 200 && reply.list) {
-            fetchedList = reply.list;
-            
-            // Use fromJson to properly restore the list with correct replicaId
-            const shoppingList = ShoppingList.fromJson(reply.list);
-            
-            localLists.set(reply.list.listId, shoppingList);
-            
-            db_worker.postMessage({ type: "create", list: shoppingList.toJson() });
-            
-            socket.close();
-            res.json({ list: shoppingList.toJson() });
-          } else {
-            socket.close();
-            res.status(404).json({ error: "List not found on server" });
-          }
-        } catch (err) {
-          console.error("Error parsing server reply:", err);
-          socket.close();
-          res.status(500).json({ error: "Failed to parse server response" });
-        }
-      });
-      
-      socket.on("error", (err) => {
-        console.error("Error fetching list from server:", err);
-        socket.close();
-        res.status(500).json({ error: "Failed to fetch list from server" });
-      });
-      
-      setTimeout(() => {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.close();
-          res.status(408).json({ error: "Fetch timeout" });
-        }
-      }, 5000);
-      
-    } catch (error) {
-      console.error("Error fetching list:", error);
-      res.status(500).json({ error: error.message });
-    }
+    return safeRespond(null, { list: list.toJson() });
   }
+
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!uuidRegex.test(listID)) {
+    return safeRespond(404, {
+      error: "List not found locally and ID is not a valid UUID",
+    });
+  }
+
+  console.log(`List ${listID} not found locally — fetching from server...`);
+
+  const tryProxy = (index) => {
+    if (index >= PROXY_PORTS.length) {
+      return safeRespond(500, {
+        error: "All proxies unavailable",
+        online: false,
+      });
+    }
+
+    const port = PROXY_PORTS[index];
+    console.log(`Trying proxy on port ${port}...`);
+
+    let socket;
+    try {
+      socket = new WebSocket(`ws://127.0.0.1:${port}`);
+    } catch (err) {
+      console.error(`Failed to create WebSocket for proxy ${port}:`, err);
+      return tryProxy(index + 1);
+    }
+
+    socket.on("open", () => {
+      console.log(`Connected to proxy ${port} — fetching list ${listID}`);
+      socket.send(JSON.stringify({ type: "get", listId: listID }));
+    });
+
+    socket.on("message", (data) => {
+      try {
+        const reply = JSON.parse(data.toString());
+
+        if (reply.code === 200 && reply.list) {
+          const shoppingList = ShoppingList.fromJson(reply.list);
+
+          // Store locally
+          localLists.set(reply.list.listId, shoppingList);
+          db_worker.postMessage({
+            type: "create",
+            list: shoppingList.toJson(),
+          });
+
+          socket.close();
+          return safeRespond(null, { list: shoppingList.toJson() });
+        }
+
+        // Not found on server
+        socket.close();
+        return safeRespond(404, { error: "List not found on server" });
+
+      } catch (err) {
+        console.error("Error parsing server reply:", err);
+        socket.close();
+        return safeRespond(500, { error: "Failed to parse server response" });
+      }
+    });
+
+    socket.on("error", (err) => {
+      console.error(`Proxy ${port} error:`, err.message);
+      socket.close();
+      if (!responded) tryProxy(index + 1);
+    });
+
+    setTimeout(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        console.log(`Proxy ${port} timed out`);
+        socket.close();
+        if (!responded) tryProxy(index + 1);
+      }
+    }, 5000);
+  };
+
+  tryProxy(0);
 });
 
 // Create a new list
@@ -305,159 +335,152 @@ app.post("/toggle-online", (req, res) => {
 
 // Sync with server
 app.post("/sync", async (req, res) => {
-  try {
-    if (localLists.size === 0) {
-      console.log("No lists to sync");
-      return res.json({ 
-        online: isOnline, 
-        syncResults: [],
-        message: "No lists to sync"
-      });
+  
+  let responded = false;
+
+  const safeRespond = (status, body) => {
+    if (responded) return;
+    responded = true;
+    if (status) res.status(status).json(body);
+    else res.json(body);
+  };
+
+  if (localLists.size === 0) {
+    return safeRespond(null, {
+      online: isOnline,
+      syncResults: [],
+      message: "No lists to sync"
+    });
+  }
+
+  console.log(`Syncing ${localLists.size} list(s)...`);
+
+  // Try proxies in order
+  const tryProxy = (index) => {
+    if (index >= PROXY_PORTS.length) {
+      return safeRespond(500, { error: "All proxies unavailable", online: false });
     }
 
-    console.log(`Syncing ${localLists.size} list(s)...`);
-    
-    const socket = new WebSocket("ws://127.0.0.1:5555");
+    const port = PROXY_PORTS[index];
+    console.log(`Trying proxy on port ${port}...`);
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
     let syncResults = [];
     let pendingReplies = 0;
     let requestCounter = 0;
-    const requestTracker = new Map(); // Maps requestId → local listId (to match replies)
+    const requestTracker = new Map();
 
     socket.on("open", () => {
-      console.log("Connected to proxy for sync");
+      console.log(`Connected to proxy ${port}`);
       isOnline = true;
 
-      // sync all lists
       localLists.forEach((list, localListId) => {
         const requestId = `sync-${requestCounter++}`;
         requestTracker.set(requestId, localListId);
         pendingReplies++;
 
-        console.log(list.toJson());
-        
-        socket.send(JSON.stringify({ 
-          type: "sync", 
+        socket.send(JSON.stringify({
+          type: "sync",
           list: list.toJson(),
           requestId
         }));
       });
 
       if (pendingReplies === 0) {
-        res.json({ online: isOnline, syncResults });
+        safeRespond(null, { online: isOnline, syncResults });
         socket.close();
-        return;
       }
     });
 
     socket.on("message", (data) => {
       try {
         const reply = JSON.parse(data.toString());
-        console.log("Sync reply:", reply.list);
-        
+
         if (reply.code === 200 && reply.list && reply.requestId) {
           const localListId = requestTracker.get(reply.requestId);
           const returnedGlobalId = reply.list.listId;
-          
+
           if (!localListId) {
-            console.error("Received reply for unknown request:", reply.requestId);
             pendingReplies--;
             if (pendingReplies === 0) {
-              res.json({ online: isOnline, syncResults });
+              safeRespond(null, { online: isOnline, syncResults });
               socket.close();
             }
             return;
           }
-          
+
           const listToUpdate = localLists.get(localListId);
           const globalList = ShoppingList.fromJson(reply.list);
-          
+
           if (listToUpdate && returnedGlobalId !== localListId) {
-            console.log(`Updating local list ID ${localListId} to global ID ${returnedGlobalId}`);
-            // Proxy assigned a new globalId (UUID) - update everything
             listToUpdate.listId = returnedGlobalId;
             localLists.delete(localListId);
             localLists.set(returnedGlobalId, globalList);
-            
-            // Persist the globalId to database
+
             db.run(
               "UPDATE list SET globalId = ? WHERE id = ?",
-              [returnedGlobalId, parseInt(localListId)],
-              (err) => {
-                if (err) console.error("Failed to update globalId:", err);
-                else console.log(`Synced: ${listToUpdate.name} (${localListId} → ${returnedGlobalId})`);
-              }
+              [returnedGlobalId, parseInt(localListId)]
             );
 
-            
-            syncResults.push({ 
+            syncResults.push({
               name: listToUpdate.name,
-              globalId: returnedGlobalId, 
-              status: 'synced' 
+              globalId: returnedGlobalId,
+              status: "synced"
             });
+
           } else if (listToUpdate) {
-
-            console.log(`List ${listToUpdate.name} already synced with global ID ${returnedGlobalId}`);
-            if(globalList.deleted){
+            if (globalList.deleted) {
               localLists.delete(returnedGlobalId);
-              db_worker.postMessage({type: "delete_permanent", listId: globalList.listId})
-            }
-            else{
-              //store the the updated lists
+              db_worker.postMessage({ type: "delete_permanent", listId: globalList.listId });
+            } else {
               localLists.set(returnedGlobalId, globalList);
-              syncResults.push({ 
+              syncResults.push({
                 name: listToUpdate.name,
-                globalId: returnedGlobalId, 
-                status: 'already-synced' 
+                globalId: returnedGlobalId,
+                status: "already-synced"
               });
-              db_worker.postMessage({type: "update", list: globalList.toJson()});
+              db_worker.postMessage({ type: "update", list: globalList.toJson() });
             }
-           
-            
           }
-
-          
         }
 
         pendingReplies--;
         if (pendingReplies === 0) {
-          res.json({ online: isOnline, syncResults });
+          safeRespond(null, { online: isOnline, syncResults });
           socket.close();
-          return;
         }
+
       } catch (err) {
         console.error("Error parsing sync reply:", err);
         pendingReplies--;
         if (pendingReplies === 0) {
-          res.json({ online: isOnline, syncResults });
+          safeRespond(null, { online: isOnline, syncResults });
           socket.close();
-          return;
         }
       }
     });
 
-    socket.on("close", () => {
-      console.log("Disconnected from proxy after sync");
-    });
-
     socket.on("error", (err) => {
-      console.error("Sync connection error:", err);
-      isOnline = false;
+      console.error(`Proxy ${port} failed:`, err.message);
       socket.close();
-      res.status(500).json({ error: "Sync failed", online: false });
+
+      // Try next proxy
+      if (!responded) {
+        tryProxy(index + 1);
+      }
     });
 
     setTimeout(() => {
       if (socket.readyState === WebSocket.OPEN) {
+        console.log(`Proxy ${port} timed out`);
         socket.close();
-        res.status(408).json({ error: "Sync timeout", online: false });
+        if (!responded) tryProxy(index + 1);
       }
-    }, 10000);
+    }, 8000);
+  };
 
-  } catch (error) {
-    console.error("Sync error:", error);
-    isOnline = false;
-    res.status(500).json({ error: error.message, online: false });
-  }
+  // Start with first proxy
+  tryProxy(0);
 });
 
 // Initialize database, load lists, then start server
