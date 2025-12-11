@@ -220,10 +220,23 @@ app.delete("/lists/:listId", (req, res) => {
     const list = localLists.get(listId);
     list.deleted = true;
     localLists.set(listId, list);
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
-    // Soft delete in database via worker
-    console.log(`Deleting list ${listId} from database`);
-    db_worker.postMessage({ type: "delete", listId });
+    //test if is a local only list
+    //Local only lists can be imediatly deleted permanently
+    if (!uuidRegex.test(listId)) {
+      // Permanent delete in database via worker
+      console.log(`Deleting permanently list ${listId} from database`);
+      db_worker.postMessage({ type: "delete_permanent", listId });
+    }
+    else{
+      // Soft delete in database via worker
+      console.log(`Deleting list ${listId} from database`);
+      db_worker.postMessage({ type: "delete", listId });
+    }
+    
+    
     
     res.json({ message: "List deleted" });
   } else {
@@ -379,14 +392,22 @@ app.post("/sync", async (req, res) => {
           } else if (listToUpdate) {
 
             console.log(`List ${listToUpdate.name} already synced with global ID ${returnedGlobalId}`);
-            //store the the updated lists
-            localLists.set(returnedGlobalId, globalList);
-            syncResults.push({ 
-              name: listToUpdate.name,
-              globalId: returnedGlobalId, 
-              status: 'already-synced' 
-            });
-            db_worker.postMessage({type: "update", list: globalList.toJson()})
+            if(globalList.deleted){
+              localLists.delete(returnedGlobalId);
+              db_worker.postMessage({type: "delete_permanent", listId: globalList.listId})
+            }
+            else{
+              //store the the updated lists
+              localLists.set(returnedGlobalId, globalList);
+              syncResults.push({ 
+                name: listToUpdate.name,
+                globalId: returnedGlobalId, 
+                status: 'already-synced' 
+              });
+              db_worker.postMessage({type: "update", list: globalList.toJson()});
+            }
+           
+            
           }
 
           

@@ -68,6 +68,32 @@ function deleteListInDB(listId) {
   }
 }
 
+function permanentDeleteListInDB(listId) {
+  // Try to delete by globalId first (UUID), then fall back to id (database ID)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
+  console.log("Permanent delete")
+  if (uuidRegex.test(listId)) {
+    db.run(
+      "DELETE FROM list WHERE globalId = ?",
+      [listId],
+      (err) => {
+        if (err) console.error("Error deleting list:", err);
+        else console.log(`List ${listId} deleted permanently (by globalId)`);
+      }
+    );
+  } else {
+    db.run(
+      "DELETE FROM list WHERE id = ?",
+      [parseInt(listId)],
+      (err) => {
+        if (err) console.error("Error deleting list:", err);
+        else console.log(`List ${listId} deleted permanently (by id)`);
+      }
+    );
+  }
+}
+
 // Handle messages from parent
 parentPort.on('message', (message) => {
   switch (message.type) {
@@ -79,6 +105,9 @@ parentPort.on('message', (message) => {
       break;
     case 'delete':
       deleteListInDB(message.listId);
+      break;
+    case 'delete_permanent':
+      permanentDeleteListInDB(message.listId);
       break;
     default:
       console.error("Unknown message type:", message.type);
