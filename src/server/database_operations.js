@@ -11,7 +11,7 @@ const { Database } = pkg;
 export function loadLists(db){
     return new Promise((resolve, reject) => {
         // Load the lists from the database
-        db.all("SELECT * FROM list WHERE soft_delete = 0;", async (err, rows) => {
+        db.all("SELECT * FROM list", async (err, rows) => {
         if (err) {
             return reject(err);
         }

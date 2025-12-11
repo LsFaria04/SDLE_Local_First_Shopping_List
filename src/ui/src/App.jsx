@@ -334,7 +334,6 @@ function App() {
                 <span className="text-gray-600">{lists.length} lists</span>
                 <button
                   onClick={syncWithServer}
-                  disabled={syncing || lists.length === 0}
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <span className={syncing ? 'animate-spin' : ''}>🔄</span>

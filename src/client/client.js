@@ -101,10 +101,12 @@ async function loadListsFromDatabase() {
 
 // Get all lists
 app.get("/lists", (req, res) => {
-  const listsArray = Array.from(localLists.values()).map((list) =>
-    list.toJson()
-  );
+  const listsArray = Array.from(localLists.values())
+    .filter((list) => list.deleted === false) 
+    .map((list) => list.toJson());
+
   res.json({ lists: listsArray });
+
 });
 
 // Get a specific list by ID
@@ -215,7 +217,9 @@ app.post("/lists", async (req, res) => {
 app.delete("/lists/:listId", (req, res) => {
   const listId = req.params.listId;
   if (localLists.has(listId)) {
-    localLists.delete(listId);
+    const list = localLists.get(listId);
+    list.deleted = true;
+    localLists.set(listId, list);
     
     // Soft delete in database via worker
     console.log(`Deleting list ${listId} from database`);
