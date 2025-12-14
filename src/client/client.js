@@ -433,13 +433,15 @@ app.post("/sync", async (req, res) => {
               localLists.delete(returnedGlobalId);
               db_worker.postMessage({ type: "delete_permanent", listId: globalList.listId });
             } else {
-              localLists.set(returnedGlobalId, globalList);
+              // Merge server changes with local changes instead of replacing
+              listToUpdate.merge(globalList);
+              localLists.set(returnedGlobalId, listToUpdate);
               syncResults.push({
                 name: listToUpdate.name,
                 globalId: returnedGlobalId,
                 status: "already-synced"
               });
-              db_worker.postMessage({ type: "update", list: globalList.toJson() });
+              db_worker.postMessage({ type: "update", list: listToUpdate.toJson() });
             }
           }
         }
