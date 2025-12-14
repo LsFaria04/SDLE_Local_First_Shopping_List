@@ -18,3 +18,10 @@ npm run start:ui #Stars the ui
 npm run start:client2
 npm run start:ui2
 ```
+
+
+To simulate the kill of a proxy or a server use the following command:
+
+```bash
+kill -9 <PID> #The pid can be obtained from a print in the console when the proxy starts
+```

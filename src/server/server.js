@@ -143,15 +143,12 @@ runWorker(process.env.SERVER_ID, process.env.PORT);
  */
 async function syncLists(incomingJson) {
     const incoming = ShoppingList.fromJson(incomingJson);
-    console.log("Incoming list:", incoming.toJson());
     let returningList = incoming;
     await lock.runExclusive(async () => {
        if (shoppingLists.has(incoming.listId)) {
         const existing = shoppingLists.get(incoming.listId);
-        console.log("Existing list before merge:", existing.toJson());
         existing.merge(incoming);
         returningList = existing;
-        console.log("Existing list after merge:", returningList.toJson());
       } else {
           shoppingLists.set(incoming.listId, incoming);
           returningList = incoming;   
@@ -204,7 +201,6 @@ async function initShoppingLists(db) {
   let shoppingLists = new Map();
 
   for (const { list, products } of lists_products) {
-    console.log(products)
     const shoppingList = new ShoppingList(
       process.env.SERVER_ID,
       list.globalId,

@@ -17,6 +17,8 @@ if (cluster.isPrimary) {
     });
   }
 
+
+
   // Fork backend servers
   SERVERS.forEach((id, idx) => {
     cluster.fork({
@@ -25,6 +27,18 @@ if (cluster.isPrimary) {
       PORT: 6000 + idx,
     });
   });
+
+  let numbWorker = 0;
+  for (const id in cluster.workers) {
+    if(numbWorker < 3){
+      console.log(`Proxy ${id} PID: ${cluster.workers[id].process.pid}`);
+    }
+    else{
+      console.log(`Server ${id - 3} PID: ${cluster.workers[id].process.pid}`);
+    }
+    numbWorker++;
+    
+  }
 
   cluster.on("exit", (worker, code, signal) => {
     console.log(`Worker ${worker.process.pid} exited with code ${code} (${signal})`);
