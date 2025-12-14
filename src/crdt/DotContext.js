@@ -14,7 +14,7 @@ export default class DotContext {
         const [replicaId, counter] = dot;
         
         // Check if it's in the compact context
-        const maxCounter = this.cc.get(replicaId);
+        const maxCounter = this.cc.get(String(replicaId));
         if (maxCounter !== undefined && counter <= maxCounter) {
             return true;
         }
@@ -31,17 +31,18 @@ export default class DotContext {
     // Adds a new dot when adding/removing items locally from the cart
     makedot(replicaId){
         // Try to get existing counter for this replica
-        const existingCounter = this.cc.get(replicaId);
+        const key = String(replicaId);
+        const existingCounter = this.cc.get(key);
         
         if (existingCounter === undefined) {
             // First time seeing this replica, start at 1
-            this.cc.set(replicaId, 1);
-            return [replicaId, 1];
+            this.cc.set(key, 1);
+            return [key, 1];
         } else {
             // Increment existing counter
             const newCounter = existingCounter + 1;
-            this.cc.set(replicaId, newCounter);
-            return [replicaId, newCounter];
+            this.cc.set(key, newCounter);
+            return [key, newCounter];
         }
     }
 
@@ -63,7 +64,8 @@ export default class DotContext {
 
             for (const dotStr of this.dc){
                 // Parse dot string "replicaId:counter"
-                const [replicaId, counterStr] = dotStr.split(':');
+                const [replicaIdRaw, counterStr] = dotStr.split(':');
+                const replicaId = String(replicaIdRaw);
                 const counter = parseInt(counterStr);
                 
                 const ccCounter = this.cc.get(replicaId);
@@ -102,18 +104,20 @@ export default class DotContext {
         
         // Merge compact contexts - take max counter for each replica
         for (const [replicaId, counter] of dotContext2.cc) {
-            const existingCounter = this.cc.get(replicaId);
+            const key = String(replicaId);
+            const existingCounter = this.cc.get(key);
             if (existingCounter === undefined) {
-                this.cc.set(replicaId, counter);
+                this.cc.set(key, counter);
             } else {
-                this.cc.set(replicaId, Math.max(existingCounter, counter));
+                this.cc.set(key, Math.max(existingCounter, counter));
             }
         }
 
         // Merge dot clouds
         for (const dotStr of dotContext2.dc) {
             // Parse and re-insert to ensure consistency
-            const [replicaId, counterStr] = dotStr.split(':');
+            const [replicaIdRaw, counterStr] = dotStr.split(':');
+            const replicaId = String(replicaIdRaw);
             const counter = parseInt(counterStr);
             this.insertDot([replicaId, counter], false);
         }
@@ -130,7 +134,7 @@ export default class DotContext {
 
     static fromJson(json) {
         const ctx = new DotContext();
-        ctx.cc = new Map(Object.entries(json.cc).map(([k, v]) => [k, Number(v)]));
+        ctx.cc = new Map(Object.entries(json.cc).map(([k, v]) => [String(k), Number(v)]));
         ctx.dc = new Set(json.dc);
         return ctx;
     }
