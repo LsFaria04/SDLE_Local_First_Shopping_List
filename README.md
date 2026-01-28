@@ -1,5 +1,7 @@
 # SDLE Second Assignment of group T03G07.
 
+ **Final Grade: 18.8**
+ 
 Group members: 
 
 1. Pedro Borges (up202207552@up.pt)
